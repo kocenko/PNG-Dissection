@@ -1,4 +1,5 @@
 from png import chunks
+import zlib
 
 
 class PNG:
@@ -26,7 +27,7 @@ class PNG:
         return bytes
 
     def __init_chunks(self) -> dict:
-        ''' Creates chunks dict and initializes with None
+        ''' Creates chunks dict and initializes with empty lists
 
         Returns:
             Dict with chunk names as keys and None as their values
@@ -34,7 +35,7 @@ class PNG:
 
         chunks = {}
         for chunk_name in self.list_of_chunks:
-            chunks[chunk_name] = None
+            chunks[chunk_name] = []
 
         return chunks 
 
@@ -74,7 +75,21 @@ class PNG:
         return int.from_bytes(bytes, 'big', signed=False)
 
     def __read_chunks(self) -> None:
-        print(self.__bytes_to_int(self.__data[8:12]))
+        data_rest = self.__data[8:]
+        try:
+            i = 0
+            while i < len(data_rest):
+                length = self.__bytes_to_int(data_rest[i:i+4])
+                chunk_type = self.__bytes_to_string(data_rest[i+4:i+8])
+                chunk_data = data_rest[i+8:i+8+length] if length > 0 else b""
+                crc = self.__bytes_to_int(data_rest[i+8+length:i+8+length+4])
+                actual_crc = zlib.crc32(data_rest[i+4:i+8+length])
+
+                print(f"Length: {length} Chunk_Type: {chunk_type} Chunk_Data (size): {len(chunk_data)} CRC: {crc} Calc CRC {actual_crc}")
+                i = i+8+length+4
+        except:
+            print("Could not read chunks: possible data corruption")
+
 
     def find_chunks(self):
         self.__read_chunks()
