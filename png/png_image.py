@@ -1,18 +1,21 @@
 from png import chunks
+from png import utils
 import zlib
 
 
 class PNG:
-    list_of_chunks = chunks.chunk_list
+    list_of_chunks = chunks.critical_chunks + chunks.ancillary_chunks
     signature = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
 
     def __init__(self, file_name: str):
         self.__file_name = file_name
         self.__data = self.__read_file()
-        self.__chunks = self.__init_chunks()
+        self.chunks = self.__init_chunks()
         
         if not self.__is_png():
             raise ValueError("Given file is not a PNG file or it is corrupted")
+        
+        self.__read_chunks()
 
     def __read_file(self) -> bytearray:
         ''' Reads bytes from file
@@ -47,54 +50,21 @@ class PNG:
         '''
 
         return True if self.__data[:8] == self.signature else False
-    
-    @staticmethod
-    def __bytes_to_string(bytes: bytearray) -> str:
-        """ Converts bytearray to string
-
-        Args:
-            bytes:
-                bytearray to convert
-        Returns:
-            Converted string
-        """
-
-        bytes_as_string = "".join(map(chr, bytes))
-        return bytes_as_string
-    
-    @staticmethod
-    def __bytes_to_int(bytes: bytearray) -> int:
-        """ Converts bytearray to int
-
-        Args:
-            bytes:
-                bytearray to convert
-        Returns:
-            Converted int
-        """
-        return int.from_bytes(bytes, 'big', signed=False)
 
     def __read_chunks(self) -> None:
         data_rest = self.__data[8:]
-        try:
-            i = 0
-            while i < len(data_rest):
-                length = self.__bytes_to_int(data_rest[i:i+4])
-                chunk_type = self.__bytes_to_string(data_rest[i+4:i+8])
-                chunk_data = data_rest[i+8:i+8+length] if length > 0 else b""
-                crc = self.__bytes_to_int(data_rest[i+8+length:i+8+length+4])
-                actual_crc = zlib.crc32(data_rest[i+4:i+8+length])
+        i = 0
+        while i < len(data_rest):
+            length = utils.bytes_to_int(data_rest[i:i+4])
+            chunk_type = utils.bytes_to_string(data_rest[i+4:i+8])
+            chunk_data = data_rest[i+8:i+8+length] if length > 0 else b""
+            crc = utils.bytes_to_int(data_rest[i+8+length:i+8+length+4])
+            actual_crc = zlib.crc32(data_rest[i+4:i+8+length])
 
-                print(f"Length: {length} Chunk_Type: {chunk_type} Chunk_Data (size): {len(chunk_data)} CRC: {crc} Calc CRC {actual_crc}")
-                i = i+8+length+4
-        except:
-            print("Could not read chunks: possible data corruption")
+            if chunk_type not in self.chunks.keys():
+                raise ValueError(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
+            
+            self.chunks[chunk_type].append({"length": length, "data": chunk_data, "proper_crc": crc == actual_crc})
+            i = i+8+length+4
 
-
-    def find_chunks(self):
-        self.__read_chunks()
-    #     for i in range(len(self.__data) - 4):
-    #         current_string = self.__bytes_to_string(self.__data[i:i+4])
-    #         if current_string in self.list_of_chunks:
-    #             print(f'Found {current_string} chunk')
 
