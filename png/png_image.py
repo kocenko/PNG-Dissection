@@ -16,6 +16,14 @@ class PNG:
             raise ValueError("Given file is not a PNG file or it is corrupted")
         
         self.__read_chunks()
+        self.__are_all_critical_read()
+
+        self.processing_arguments_mapping = {
+            'IHDR': ('HAHA', 'BEEE'),
+            'PLTE': (lambda: self.chunks["IHDR"], ),
+            'IDAT': (lambda: self.chunks["IHDR"], )
+
+        }
 
     def __read_file(self) -> bytearray:
         ''' Reads bytes from file
@@ -70,11 +78,52 @@ class PNG:
             self.chunks[chunk_type].append(chunks.Chunk(length, chunk_type, chunk_data, crc != actual_crc))
             i = i+8+length+4
 
-    def process_chunks(self):
+    def __are_all_critical_read(self) -> None:
+        ''' Checks if all critical chunks were read
+        '''
+
+        for chunk_type in chunks.critical_chunks:
+            if self.chunks[chunk_type] == []:
+                print(f"Critical chunk {chunk_type} was not found in the file")
+
+    def is_chunk_read(self, chunk_type: str) -> bool:
+        ''' Checks if the chunk of the given name was read
+
+        Args:
+            str:
+                Chunk name
+
+        Returns:
+            True if was read, False otherwise
+        '''
+
+        if self.chunks[chunk_type] == []:
+            return False
+        return True
+
+    def process_chunks(self) -> None:
         ''' Processes chunks to get information according to the chunk specification
         '''
-        
+
         for key in self.chunks:
             for single_chunk in self.chunks[key]:
-                single_chunk.process()
+                arguments = self.processing_arguments_mapping.get(key)
+                if arguments:
+                    processed_arguments = [arg() if callable(arg) else arg for arg in arguments]
+                    single_chunk.process(*processed_arguments)
+                else:
+                    single_chunk.process()
+
+    def display_chunk(self, chunk_type: str) -> None:
+        ''' Displays processed chunk
+        '''
+
+        if chunk_type not in self.chunks.keys():
+            raise ValueError(f"Could not display chunk {chunk_type}, not in the list")
+        
+        if not self.is_chunk_read(chunk_type):
+            raise ValueError(f"Could not display chunk {chunk_type}, it was not read")
+
+        for single_chunk in self.chunks[chunk_type]:
+            single_chunk.display()
 
