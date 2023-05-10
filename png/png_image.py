@@ -52,6 +52,9 @@ class PNG:
         return True if self.__data[:8] == self.signature else False
 
     def __read_chunks(self) -> None:
+        ''' Reads the bytearray and dissects it into chunks
+        '''
+
         data_rest = self.__data[8:]
         i = 0
         while i < len(data_rest):
@@ -68,6 +71,9 @@ class PNG:
             i = i+8+length+4
 
     def process_chunks(self):
+        ''' Processes chunks to get information according to the chunk specification
+        '''
+        
         for key in self.chunks:
             for single_chunk in self.chunks[key]:
                 single_chunk.process()

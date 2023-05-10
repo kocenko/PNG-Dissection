@@ -4,35 +4,38 @@ critical_chunks = ["IHDR", "PLTE", "IDAT", "IEND"]
 ancillary_chunks = ["cHRM", "gAMA", "iCCP", "sBIT", "sRGB", "bKGD", "hIST", "tRNS", "pHYs", "sPLT", "tIME", "iTXt", "tEXt", "zTXt"]
 
 class Chunk():
+    processing_logic = {
+        "IHDR": "process_IHDR",
+        "PLTE": "process_PLTE",
+        "IDAT": "process_IDAT",
+        "IEND": "process_IEND",
+        "cHRM": "process_cHRM",
+        "gAMA": "process_gAMA",
+        "iCCP": "process_iCCP",
+        "sBIT": "process_sBIT",
+        "sRGB": "process_sRGB",
+        "bKGD": "process_bKGD",
+        "hIST": "process_hIST",
+        "tRNS": "process_tRNS",
+        "pHYs": "process_pHYs",
+        "sPLT": "process_sPLT",
+        "tIME": "process_tIME",
+        "iTXt": "process_iTXt",
+        "tEXt": "process_tEXt",
+        "zTXt": "process_zTXt",
+    }
+
     def __init__(self, length: int, name: str, content: bytearray, corrupted: bool):
         self.corrupted = corrupted
         self.length = length
         self.name = name
         self.data = content
         self.processed = False
-        
-        self.processing_logic = {
-            "IHDR": self.process_IHDR,
-            "PLTE": self.process_PLTE,
-            "IDAT": self.process_IDAT,
-            "IEND": self.process_IEND,
-            "cHRM": self.process_cHRM,
-            "gAMA": self.process_gAMA,
-            "iCCP": self.process_iCCP,
-            "sBIT": self.process_sBIT,
-            "sRGB": self.process_sRGB,
-            "bKGD": self.process_bKGD,
-            "hIST": self.process_hIST,
-            "tRNS": self.process_tRNS,
-            "pHYs": self.process_pHYs,
-            "sPLT": self.process_sPLT,
-            "tIME": self.process_tIME,
-            "iTXt": self.process_iTXt,
-            "tEXt": self.process_tEXt,
-            "zTXt": self.process_zTXt,
-        }
 
     def process(self) -> None:
+        ''' Method processing a chunk according to its specification
+        '''
+
         if self.corrupted:
             raise ValueError("Chunk is corrupted. Cannot process")
         
@@ -42,60 +45,78 @@ class Chunk():
         if self.name not in self.processing_logic:    
             raise NotImplementedError(f"Processing for {self.name} was not implemented yet")
         
-        self.processing_logic[self.name]()
+        getattr(self, Chunk.processing_logic[self.name])()
         self.processsed = True
     
 
-    def process_IHDR(self) -> None:
+    @staticmethod    
+    def process_IHDR() -> None:
         print("Processing IHDR...")
 
-    def process_PLTE(self) -> None:
+    @staticmethod   
+    def process_PLTE() -> None:
         print("Processing PLTE...")
 
-    def process_IDAT(self) -> None:
+    @staticmethod
+    def process_IDAT() -> None:
         print("Processing IDAT...")
 
-    def process_IEND(self) -> None:
+    @staticmethod
+    def process_IEND() -> None:
         print("Processing IEND...")
 
-    def process_cHRM(self) -> None:
+    @staticmethod
+    def process_cHRM() -> None:
         print("Processing cHRM...")
 
-    def process_gAMA(self) -> None:
+    @staticmethod
+    def process_gAMA() -> None:
         print("Processing gAMA...")
 
-    def process_iCCP(self) -> None:
+    @staticmethod
+    def process_iCCP() -> None:
         print("Processing iCCP...")
 
-    def process_sBIT(self) -> None:
+    @staticmethod
+    def process_sBIT() -> None:
         print("Processing sBIT...")
 
-    def process_sRGB(self) -> None:
+    @staticmethod
+    def process_sRGB() -> None:
         print("Processing sRGB...")
 
-    def process_bKGD(self) -> None:
+    @staticmethod
+    def process_bKGD() -> None:
         print("Processing bKGD...")
 
-    def process_hIST(self) -> None:
+    @staticmethod
+    def process_hIST() -> None:
         print("Processing hIST...")
 
-    def process_tRNS(self) -> None:
+    @staticmethod
+    def process_tRNS() -> None:
         print("Processing tRNS...")
 
-    def process_pHYs(self) -> None:
+    @staticmethod
+    def process_pHYs() -> None:
         print("Processing pHYs...")
 
-    def process_sPLT(self) -> None:
+    @staticmethod
+    def process_sPLT() -> None:
         print("Processing sPLT...")
 
-    def process_tIME(self) -> None:
+    @staticmethod
+    def process_tIME() -> None:
         print("Processing tIME...")
 
-    def process_iTXt(self) -> None:
+    @staticmethod
+    def process_iTXt() -> None:
         print("Processing iTXt...")
 
-    def process_tEXt(self) -> None:
+    @staticmethod
+    def process_tEXt() -> None:
         print("Processing tEXt...")
 
-    def process_zTXt(self) -> None:
+    @staticmethod
+    def process_zTXt() -> None:
         print("Processing zTXt...")
