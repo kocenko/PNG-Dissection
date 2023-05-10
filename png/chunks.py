@@ -1,4 +1,7 @@
-from abc import ABC, abstractmethod
+from typing import Callable, TypeVar
+
+
+T = TypeVar('T')
 
 critical_chunks = ["IHDR", "PLTE", "IDAT", "IEND"]
 ancillary_chunks = ["cHRM", "gAMA", "iCCP", "sBIT", "sRGB", "bKGD", "hIST", "tRNS", "pHYs", "sPLT", "tIME", "iTXt", "tEXt", "zTXt"]
@@ -26,11 +29,11 @@ class Chunk():
     }
 
     def __init__(self, length: int, name: str, content: bytearray, corrupted: bool):
-        self.corrupted = corrupted
-        self.length = length
-        self.name = name
-        self.data = content
-        self.processed = False
+        self.corrupted: bool = corrupted
+        self.length: int = length
+        self.name: str = name
+        self.data: bytearray = content
+        self.processed_data: T = None
 
     def process(self) -> None:
         ''' Method processing a chunk according to its specification
@@ -39,84 +42,67 @@ class Chunk():
         if self.corrupted:
             raise ValueError("Chunk is corrupted. Cannot process")
         
-        if self.processed:
+        if self.processed_data != None:
             raise ValueError("Chunk was already processed")
         
         if self.name not in self.processing_logic:    
             raise NotImplementedError(f"Processing for {self.name} was not implemented yet")
         
-        getattr(self, Chunk.processing_logic[self.name])()
-        self.processsed = True
+        method_name = Chunk.processing_logic[self.name]
+        method: Callable[[bytearray], T] = getattr(self, method_name)
+        self.processsed_data = method()
     
-
-    @staticmethod    
-    def process_IHDR() -> None:
+    
+    def process_IHDR(self) -> None:
         print("Processing IHDR...")
-
-    @staticmethod   
-    def process_PLTE() -> None:
+    
+    def process_PLTE(self) -> None:
         print("Processing PLTE...")
 
-    @staticmethod
-    def process_IDAT() -> None:
+    def process_IDAT(self) -> None:
         print("Processing IDAT...")
 
-    @staticmethod
-    def process_IEND() -> None:
+    def process_IEND(self) -> None:
         print("Processing IEND...")
 
-    @staticmethod
-    def process_cHRM() -> None:
+    def process_cHRM(self) -> None:
         print("Processing cHRM...")
 
-    @staticmethod
-    def process_gAMA() -> None:
+    def process_gAMA(self) -> None:
         print("Processing gAMA...")
 
-    @staticmethod
-    def process_iCCP() -> None:
+    def process_iCCP(self) -> None:
         print("Processing iCCP...")
 
-    @staticmethod
-    def process_sBIT() -> None:
+    def process_sBIT(self) -> None:
         print("Processing sBIT...")
 
-    @staticmethod
-    def process_sRGB() -> None:
+    def process_sRGB(self) -> None:
         print("Processing sRGB...")
 
-    @staticmethod
-    def process_bKGD() -> None:
+    def process_bKGD(self) -> None:
         print("Processing bKGD...")
 
-    @staticmethod
-    def process_hIST() -> None:
+    def process_hIST(self) -> None:
         print("Processing hIST...")
 
-    @staticmethod
-    def process_tRNS() -> None:
+    def process_tRNS(self) -> None:
         print("Processing tRNS...")
 
-    @staticmethod
-    def process_pHYs() -> None:
+    def process_pHYs(self) -> None:
         print("Processing pHYs...")
 
-    @staticmethod
-    def process_sPLT() -> None:
+    def process_sPLT(self) -> None:
         print("Processing sPLT...")
 
-    @staticmethod
-    def process_tIME() -> None:
+    def process_tIME(self) -> None:
         print("Processing tIME...")
 
-    @staticmethod
-    def process_iTXt() -> None:
+    def process_iTXt(self) -> None:
         print("Processing iTXt...")
 
-    @staticmethod
-    def process_tEXt() -> None:
+    def process_tEXt(self) -> None:
         print("Processing tEXt...")
 
-    @staticmethod
-    def process_zTXt() -> None:
+    def process_zTXt(self) -> None:
         print("Processing zTXt...")
