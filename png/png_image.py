@@ -64,7 +64,11 @@ class PNG:
             if chunk_type not in self.chunks.keys():
                 raise ValueError(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
             
-            self.chunks[chunk_type].append({"length": length, "data": chunk_data, "proper_crc": crc == actual_crc})
+            self.chunks[chunk_type].append(chunks.Chunk(length, chunk_type, chunk_data, crc != actual_crc))
             i = i+8+length+4
 
+    def process_chunks(self):
+        for key in self.chunks:
+            for single_chunk in self.chunks[key]:
+                single_chunk.process()
 
