@@ -57,7 +57,7 @@ class Chunk():
         self.data: bytearray or List[bytearray] = content
         self.processed_data: T = None
 
-    def process(self, *kwargs) -> None:
+    def process(self, **kwargs) -> None:
         ''' Method processing a chunk according to its specification
         '''
 
@@ -118,6 +118,10 @@ class Chunk():
         if len(self.data) % 3 != 0:
             raise ValueError(f"PLTE chunk length should be divisible by 3 but is {len(self.data)}")
 
+        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
+        if len(self.data) // 3 > bit_depth:
+            raise ValueError(f"Number of palette entries: {len(self.data) // 3} exceeds bit depth: {bit_depth}")
+
         decoded_values = []
         for i in range(0, len(self.data), 3):
             single_dict = {}
@@ -129,6 +133,7 @@ class Chunk():
         return decoded_values
 
     def process_IDAT(self, arguments: dict) -> None:
+        print(arguments)
         pass
         #print("Processing IDAT...")
 

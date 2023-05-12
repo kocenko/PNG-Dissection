@@ -19,9 +19,9 @@ class PNG:
         self.__read_chunks()
 
         self.processing_arguments_mapping = {
-            'IHDR': (),
-            'PLTE': (lambda: self.chunks["IHDR"], ),
-            'IDAT': (lambda: self.chunks["IHDR"], )
+            'IHDR': {},
+            'PLTE': {"IHDR_values": lambda: self.chunks["IHDR"]},
+            'IDAT': {"IHDR_values": lambda: self.chunks["IHDR"]}
         }
 
     def __read_file(self) -> bytearray:
@@ -194,8 +194,10 @@ class PNG:
             if value != None:
                 arguments = self.processing_arguments_mapping.get(key)
                 if arguments:
-                    processed_arguments = [arg() if callable(arg) else arg for arg in arguments]
-                    value.process(*processed_arguments)
+                    processed_arguments = {}
+                    for arg_key, arg_val in arguments.items():
+                        processed_arguments[arg_key] = arg_val() if callable(arg_val) else arg_val
+                    value.process(**processed_arguments)
                 else:
                     value.process()
 
