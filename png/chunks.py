@@ -156,6 +156,8 @@ class Chunk():
         image_width = arguments["IHDR_values"].processed_data["width"]
         image_height = arguments["IHDR_values"].processed_data["height"]
 
+        # Single scanline consists of 1 byte depicting which filtering was used
+        # The rest of the scanline is data to be treated with inverse filter
         filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
         if filtering_method == 0:
             for i in range(image_height):
