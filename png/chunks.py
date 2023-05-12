@@ -50,11 +50,11 @@ class Chunk():
         "zTXt": "display_zTXt",
     }
 
-    def __init__(self, length: int, name: str, content: bytearray, corrupted: bool):
+    def __init__(self, length: int, name: str, content: bytearray or List[bytearray], corrupted: bool):
         self.corrupted: bool = corrupted
         self.length: int = length
         self.name: str = name
-        self.data: bytearray = content
+        self.data: bytearray or List[bytearray] = content
         self.processed_data: T = None
 
     def process(self, *kwargs) -> None:
@@ -82,7 +82,7 @@ class Chunk():
         '''
 
         try:
-            if self.processed_data is None:
+            if self.processed_data == None:
                 raise ValueError("Chunk has not been processed yet")
             
             if self.name not in self.displaying_logic:    
@@ -100,7 +100,8 @@ class Chunk():
     ### Processing methods
 
     def process_IHDR(self, arguments: dict) -> dict:
-        print(arguments)
+        if len(arguments) == 0:
+            pass
 
         decoded_values = {}
         decoded_values["width"] = utils.bytes_to_int(self.data[: 4])
@@ -179,9 +180,10 @@ class Chunk():
         pass
         #print("Processing tIME...")
 
-    def process_iTXt(self, arguments: dict) -> None:
-        pass
-        #print("Processing iTXt...")
+    def process_iTXt(self, arguments: dict) -> str:
+        if len(arguments) == 0:
+            pass
+        return "".join(utils.bytes_to_string(a) for a in self.data)
 
     def process_tEXt(self, arguments: dict) -> None:
         pass
@@ -257,8 +259,7 @@ class Chunk():
         #print("Displaying tIME...")
 
     def display_iTXt(self) -> None:
-        pass
-        #print("Displaying iTXt...")
+        print(f"{self.processed_data}")
 
     def display_tEXt(self) -> None:
         pass

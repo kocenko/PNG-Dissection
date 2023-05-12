@@ -6,6 +6,7 @@ import zlib
 class PNG:
     list_of_chunks = chunks.critical_chunks + chunks.ancillary_chunks
     signature = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+    multiple_chunks_allowed_for = ["IDAT", "sPLT", "iTXt", "tEXt", "zTXt"]
 
     def __init__(self, file_name: str):
         self.__file_name = file_name
@@ -16,13 +17,11 @@ class PNG:
             raise ValueError("Given file is not a PNG file or it is corrupted")
         
         self.__read_chunks()
-        self.__are_all_critical_read()
 
         self.processing_arguments_mapping = {
-            'IHDR': ('HAHA', 'BEEE'),
+            'IHDR': (),
             'PLTE': (lambda: self.chunks["IHDR"], ),
             'IDAT': (lambda: self.chunks["IHDR"], )
-
         }
 
     def __read_file(self) -> bytearray:
@@ -46,7 +45,7 @@ class PNG:
 
         chunks = {}
         for chunk_name in self.list_of_chunks:
-            chunks[chunk_name] = []
+                chunks[chunk_name] = None
 
         return chunks 
 
@@ -75,16 +74,17 @@ class PNG:
             if chunk_type not in self.chunks.keys():
                 raise ValueError(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
             
-            self.chunks[chunk_type].append(chunks.Chunk(length, chunk_type, chunk_data, crc != actual_crc))
+            if chunk_type in PNG.multiple_chunks_allowed_for:
+                if self.chunks[chunk_type] == None:
+                    self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, [chunk_data], crc != actual_crc)
+                else:
+                    self.chunks[chunk_type].data.append(chunk_data)
+            else:
+                if self.chunks[chunk_type] != None:
+                    raise KeyError(f"Chunk {chunk_type} does not allow multiple instances")
+                self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, chunk_data, crc != actual_crc)
+
             i = i+8+length+4
-
-    def __are_all_critical_read(self) -> None:
-        ''' Checks if all critical chunks were read
-        '''
-
-        for chunk_type in chunks.critical_chunks:
-            if self.chunks[chunk_type] == []:
-                print(f"Critical chunk {chunk_type} was not found in the file")
 
     def is_chunk_read(self, chunk_type: str) -> bool:
         ''' Checks if the chunk of the given name was read
@@ -97,7 +97,7 @@ class PNG:
             True if was read, False otherwise
         '''
 
-        if self.chunks[chunk_type] == []:
+        if self.chunks[chunk_type] == None:
             return False
         return True
 
@@ -105,14 +105,14 @@ class PNG:
         ''' Processes chunks to get information according to the chunk specification
         '''
 
-        for key in self.chunks:
-            for single_chunk in self.chunks[key]:
+        for key, value in self.chunks.items():
+            if value != None:
                 arguments = self.processing_arguments_mapping.get(key)
                 if arguments:
                     processed_arguments = [arg() if callable(arg) else arg for arg in arguments]
-                    single_chunk.process(*processed_arguments)
+                    value.process(*processed_arguments)
                 else:
-                    single_chunk.process()
+                    value.process()
 
     def display_chunk(self, chunk_type: str) -> None:
         ''' Displays processed chunk
@@ -124,6 +124,5 @@ class PNG:
         if not self.is_chunk_read(chunk_type):
             raise ValueError(f"Could not display chunk {chunk_type}, it was not read")
 
-        for single_chunk in self.chunks[chunk_type]:
-            single_chunk.display()
+        self.chunks[chunk_type].display()
 
