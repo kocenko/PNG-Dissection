@@ -68,16 +68,26 @@ class PNG:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
                 if self.chunks["IEND"] != None:
                     raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+                if self.chunks["bKGD"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"bKGD\"")
+                if self.chunks["hIST"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"hIST\"")
+                if self.chunks["tRNS"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"tRNS\"")
             case "cHRM":
                 if self.chunks["PLTE"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
                 if self.chunks["IDAT"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
             case "gAMA":
                 if self.chunks["PLTE"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
                 if self.chunks["IDAT"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
             case "iCCP":
                 if self.chunks["PLTE"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
@@ -85,11 +95,15 @@ class PNG:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
                 if self.chunks["sRGB"] != None:
                     raise ValueError(f"{chunk_type} should not be present when \"sRGB\" is present")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
             case "sBIT":
                 if self.chunks["PLTE"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
                 if self.chunks["IDAT"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
             case "sRGB":
                 if self.chunks["PLTE"] != None:
                     raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
@@ -97,6 +111,33 @@ class PNG:
                     raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
                 if self.chunks["iCCP"] != None:
                     raise ValueError(f"{chunk_type} should not be present when \"iCCP\" is present")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "bKGD":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "hIST":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "tRNS":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "pHYs":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "sPLT":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
             case _:
                 pass
 
