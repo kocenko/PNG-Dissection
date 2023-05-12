@@ -58,6 +58,48 @@ class PNG:
 
         return True if self.__data[:8] == self.signature else False
 
+    def __check_ordering(self, chunk_type: str) -> None:
+        match chunk_type:
+            case "IHDR":
+                if any(self.chunks[chunk] != None for chunk in PNG.list_of_chunks):
+                    raise ValueError(f"Chunk {chunk_type} should appear first")
+            case "PLTE":
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["IEND"] != None:
+                    raise ValueError(f"Chunk \"IEND\" should appear after the chunk {chunk_type}")
+            case "cHRM":
+                if self.chunks["PLTE"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+            case "gAMA":
+                if self.chunks["PLTE"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+            case "iCCP":
+                if self.chunks["PLTE"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["sRGB"] != None:
+                    raise ValueError(f"{chunk_type} should not be present when \"sRGB\" is present")
+            case "sBIT":
+                if self.chunks["PLTE"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+            case "sRGB":
+                if self.chunks["PLTE"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"PLTE\"")
+                if self.chunks["IDAT"] != None:
+                    raise ValueError(f"{chunk_type} should be read before \"IDAT\"")
+                if self.chunks["iCCP"] != None:
+                    raise ValueError(f"{chunk_type} should not be present when \"iCCP\" is present")
+            case _:
+                pass
+
     def __read_chunks(self) -> None:
         ''' Reads the bytearray and dissects it into chunks
         '''
@@ -74,6 +116,8 @@ class PNG:
             if chunk_type not in self.chunks.keys():
                 raise ValueError(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
             
+            self.__check_ordering(chunk_type)
+
             if chunk_type in PNG.multiple_chunks_allowed_for:
                 if self.chunks[chunk_type] == None:
                     self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, [chunk_data], crc != actual_crc)
