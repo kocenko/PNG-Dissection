@@ -1,5 +1,7 @@
 from typing import Callable, TypeVar, List
 from png import utils
+import itertools
+import zlib
 
 
 T = TypeVar('T')
@@ -133,9 +135,34 @@ class Chunk():
         return decoded_values
 
     def process_IDAT(self, arguments: dict) -> None:
-        print(arguments)
-        pass
-        #print("Processing IDAT...")
+        compression_method = arguments["IHDR_values"].processed_data["compression_method"]
+        if compression_method == 0:
+            zlib_datastream = bytearray(itertools.chain.from_iterable(self.data))
+            decompressed = zlib.decompress(zlib_datastream)
+        
+        # Finding bytes per pixel
+        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
+        if colour_type in [0, 3]:
+            nb_channels = 1
+        elif colour_type in [4]:
+            nb_channels = 2
+        elif colour_type in [2]:
+            nb_channels = 3
+        else:
+            nb_channels = 4
+        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
+        bytes_per_pixel = (bit_depth * nb_channels) // 8
+
+        image_width = arguments["IHDR_values"].processed_data["width"]
+        image_height = arguments["IHDR_values"].processed_data["height"]
+
+        filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
+        if filtering_method == 0:
+            for i in range(image_height):
+                filter_flag_begin = i * (image_width * bytes_per_pixel + 1)
+                filter_flag_end = filter_flag_begin + 1
+                current_filter_flag = utils.bytes_to_int(decompressed[filter_flag_begin: filter_flag_end])
+                
 
     def process_IEND(self, arguments: dict) -> None:
         pass
