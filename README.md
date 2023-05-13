@@ -11,3 +11,8 @@
 
 ### Additional extensions
 - TODO
+
+## Possible places to hide information
+ - In the IDAT chunk choice of filters is arbitrary. Because in the standard filtering mode (= 0)
+   the number of possible filtering functions is equal to 5, there are 5 possible values to store
+   at the beginning of each scanline of the uncompressed image.

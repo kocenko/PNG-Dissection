@@ -2,6 +2,8 @@ from typing import Callable, TypeVar, List
 from png import utils
 import itertools
 import zlib
+import math
+import numpy as np
 
 
 T = TypeVar('T')
@@ -134,36 +136,110 @@ class Chunk():
             
         return decoded_values
 
-    def process_IDAT(self, arguments: dict) -> None:
+    def __decompress_zlib_datastream(self, arguments: dict) -> bytearray:
         compression_method = arguments["IHDR_values"].processed_data["compression_method"]
-        if compression_method == 0:
-            zlib_datastream = bytearray(itertools.chain.from_iterable(self.data))
-            decompressed = zlib.decompress(zlib_datastream)
-        
-        # Finding bytes per pixel
-        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
-        if colour_type in [0, 3]:
-            nb_channels = 1
-        elif colour_type in [4]:
-            nb_channels = 2
-        elif colour_type in [2]:
-            nb_channels = 3
-        else:
-            nb_channels = 4
-        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
-        bytes_per_pixel = (bit_depth * nb_channels) // 8
+        if compression_method != 0:
+            raise ValueError(f"Only compression method {compression_method} is defined by the standard")
 
-        image_width = arguments["IHDR_values"].processed_data["width"]
+        zlib_datastream = bytearray(itertools.chain.from_iterable(self.data))
+        return zlib.decompress(zlib_datastream)
+
+    def __calculate_bytes_per_pixel(self, arguments: dict, num_channels: int) -> int:
+        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
+        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
+          
+        match colour_type:
+            case 0:
+                return math.ceil(bit_depth / 8)
+            case 2:
+                return num_channels * bit_depth // 8
+            case 3:
+                return 1  # Because it is indexed by the colour palette
+            case 4:
+                return num_channels * bit_depth // 8
+            case 6:
+                return num_channels * bit_depth // 8
+            case _:
+                raise ValueError(f"Unrecognized colour type: {colour_type}")
+
+    @staticmethod
+    def __paeth_predictor(a: int, b: int, c: int) -> int:
+        p = a + b - c
+        pa = np.abs(p - a)
+        pb = np.abs(p - b)
+        pc = np.abs(p - c)
+
+        if pa <= pb and pa <= pc:
+            return a
+        elif pb <= pc:
+            return b
+        else:
+            return c
+
+    def __reconstruct_scanline(self, to_reconstruct: bytearray, prior_scanline: bytearray, filter_flag: int) -> bytearray:
+        reconstructed = bytearray(to_reconstruct)
+        modulo_value = 256
+        match filter_flag:
+            case 0:
+                return to_reconstruct
+            case 1:
+                for i in range(len(to_reconstruct)):
+                    recon_a = reconstructed[i-1] if i > 0 else 0
+                    reconstructed[i] = (to_reconstruct[i] + recon_a) % modulo_value
+            case 2:
+                for i in range(len(to_reconstruct)):
+                    recon_b = prior_scanline[i]
+                    reconstructed[i] = (to_reconstruct[i] + recon_b) % modulo_value
+            case 3:
+                for i in range(len(to_reconstruct)):
+                    recon_a = reconstructed[i-1] if i > 0 else 0
+                    recon_b = prior_scanline[i]
+                    reconstructed[i] = (to_reconstruct[i] + math.floor((recon_a + recon_b) / 2)) % modulo_value
+            case 4:
+                for i in range(len(to_reconstruct)):
+                    recon_a = reconstructed[i-1] if i > 0 else 0
+                    recon_b = prior_scanline[i]
+                    recon_c = prior_scanline[i-1] if i > 0 else 0
+                    reconstructed[i] = (to_reconstruct[i] + self.__paeth_predictor(recon_a, recon_b, recon_c)) % modulo_value
+            case _:
+                raise ValueError(f"Invalid filter flag: {filter_flag}")
+            
+        return reconstructed
+
+    def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int) -> None:
         image_height = arguments["IHDR_values"].processed_data["height"]
+        image_width = arguments["IHDR_values"].processed_data["width"]
+
+        output = []
+
+        prior_scanline = bytearray(image_width * bytes_per_pixel + 1)
+        for i in range(image_height):
+            scanline_begin = i * (image_width * bytes_per_pixel + 1)
+            scanline_end = scanline_begin + (image_width * bytes_per_pixel + 1)
+            filter_flag = utils.bytes_to_int(decompressed[scanline_begin: scanline_begin+1])
+            single_scanline = decompressed[scanline_begin+1: scanline_end]
+            prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, filter_flag)
+            output.append(prior_scanline)
+
+        return output
+
+    def process_IDAT(self, arguments: dict) -> None:
+        
+        num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 5: 4}
+
+        filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
+        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
+
+        # pixels = np.empty((image_height, image_width, num_channels_dict[colour_type]))
+        decompressed = self.__decompress_zlib_datastream(arguments)
+        bytes_per_pixel = self.__calculate_bytes_per_pixel(arguments, num_channels_dict[colour_type])
 
         # Single scanline consists of 1 byte depicting which filtering was used
         # The rest of the scanline is data to be treated with inverse filter
-        filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
-        if filtering_method == 0:
-            for i in range(image_height):
-                filter_flag_begin = i * (image_width * bytes_per_pixel + 1)
-                filter_flag_end = filter_flag_begin + 1
-                current_filter_flag = utils.bytes_to_int(decompressed[filter_flag_begin: filter_flag_end])
+        if filtering_method != 0:
+            raise ValueError(f"Only filter method 0 is defined by the standard not {filtering_method}")
+        
+        print(len(self.__reconstruct_pixels(arguments, decompressed, bytes_per_pixel)))
                 
 
     def process_IEND(self, arguments: dict) -> None:
