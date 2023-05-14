@@ -148,7 +148,7 @@ class Chunk():
     def __calculate_bytes_per_pixel(self, arguments: dict, num_channels: int) -> int:
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
         bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
-          
+
         match colour_type:
             case 0:
                 return math.ceil(bit_depth / 8)
@@ -230,7 +230,7 @@ class Chunk():
 
     def process_IDAT(self, arguments: dict) -> np.ndarray:
         
-        num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 5: 4}
+        num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 
         filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
