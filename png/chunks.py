@@ -147,15 +147,15 @@ class Chunk():
             raise ValueError(f"PLTE chunk length should be divisible by 3 but is {len(self.data)}")
 
         bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
-        if len(self.data) // 3 > bit_depth:
-            raise ValueError(f"Number of palette entries: {len(self.data) // 3} exceeds bit depth: {bit_depth}")
+        if len(self.data) // 3 > 2**bit_depth:
+            raise ValueError(f"Number of palette entries: {len(self.data) // 3} exceeds range defined by the bit depth: {2**bit_depth}")
 
         decoded_values = []
         for i in range(0, len(self.data), 3):
             single_dict = {}
-            single_dict["red"] = utils.bytes_to_int(self.data[i])
-            single_dict["green"] = utils.bytes_to_int(self.data[i+1])
-            single_dict["blue"] = utils.bytes_to_int(self.data[i+2])
+            single_dict["red"] = self.data[i]
+            single_dict["green"] = self.data[i+1]
+            single_dict["blue"] = self.data[i+2]
             decoded_values.append(single_dict)
             
         return decoded_values
@@ -177,7 +177,7 @@ class Chunk():
         zlib_datastream = bytearray(itertools.chain.from_iterable(self.data))
         return zlib.decompress(zlib_datastream)
 
-    def __calculate_bytes_per_pixel(self, arguments: dict, num_channels: int) -> int:
+    def __calculate_bytes_per_pixel(self, arguments: dict, num_channels: int) -> int or float:
         ''' Calculates how many bytes describing a pixel
 
         Outcome value depends on the bit depth. If bit depth is smaller than 8,
@@ -198,15 +198,15 @@ class Chunk():
 
         match colour_type:
             case 0:
-                return math.ceil(bit_depth / 8)
+                return bit_depth / 8
             case 2:
-                return num_channels * bit_depth // 8
+                return num_channels * bit_depth / 8
             case 3:
-                return 1  # Because it is indexed by the colour palette
+                return bit_depth / 8
             case 4:
-                return num_channels * bit_depth // 8
+                return num_channels * bit_depth / 8
             case 6:
-                return num_channels * bit_depth // 8
+                return num_channels * bit_depth / 8
             case _:
                 raise ValueError(f"Unrecognized colour type: {colour_type}")
 
@@ -253,12 +253,13 @@ class Chunk():
 
         reconstructed = np.zeros(len(to_reconstruct))
         modulo_value = 256
+        bpp = math.ceil(bytes_per_pixel)
 
         for i in range(len(to_reconstruct)):
             current_byte = to_reconstruct[i]
-            prior_byte = reconstructed[i-bytes_per_pixel] if i >= bytes_per_pixel else 0
+            prior_byte = reconstructed[i-bpp] if i >= bpp else 0
             prior_scanline_byte = prior_scanline[i]
-            prior_scanline_prior_byte = prior_scanline[i-bytes_per_pixel] if i >= bytes_per_pixel else 0
+            prior_scanline_prior_byte = prior_scanline[i-bpp] if i >= bpp else 0
 
             match filter_flag:
                 case 0:
@@ -276,10 +277,11 @@ class Chunk():
             
             reconstructed[i] = reconstructed_byte
 
+
         return reconstructed
 
     @staticmethod
-    def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int) -> np.ndarray:
+    def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int, bit_depth: int, colour_type: int) -> np.ndarray:
         ''' Reshaping scanline to row of pixels
 
         Args:
@@ -287,11 +289,24 @@ class Chunk():
                 scanline: scanline to convert to pixels
             int:
                 num_channels: Number of channels
+                bit_depth: Number indicating bit depth
+                colour_type: Number indicating colour type
 
         Returns:
             numpy array of row of pixels
         '''
-        output = scanline.reshape((-1, num_channels))
+        output = scanline.copy()
+        
+        if bit_depth < 8:
+            num_bits = 8 // bit_depth
+            for i, b in enumerate(scanline):
+                output[i: i+num_bits] = utils.split_bytes_to_bits(int(b), num_bits)
+
+        if colour_type != 3:
+            output = output.reshape((-1, num_channels))
+        else:
+            output = output  # Change to the values from the PLTE
+        
         return output
 
     def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int, num_channels: int) -> np.ndarray:
@@ -312,17 +327,22 @@ class Chunk():
         
         image_height = arguments["IHDR_values"].processed_data["height"]
         image_width = arguments["IHDR_values"].processed_data["width"]
+        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
+        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
 
         output = np.empty((image_height, image_width, num_channels), dtype=np.uint8)
 
-        prior_scanline = bytearray(image_width * bytes_per_pixel + 1)
-        for i in range(image_height):
-            scanline_begin = i * (image_width * bytes_per_pixel + 1)
-            scanline_end = scanline_begin + (image_width * bytes_per_pixel + 1)
-            filter_flag = utils.bytes_to_int(decompressed[scanline_begin: scanline_begin+1])
+        scanlines_width = math.ceil(image_width * bytes_per_pixel + 1)
+        scanlines_height = int(len(decompressed) / scanlines_width)
+
+        prior_scanline = bytearray(scanlines_width)
+        for i in range(scanlines_height):
+            scanline_begin = i * scanlines_width
+            scanline_end = scanline_begin + scanlines_width
+            filter_flag = decompressed[scanline_begin]
             single_scanline = bytearray(decompressed[scanline_begin+1: scanline_end])
             prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, bytes_per_pixel, filter_flag)
-            output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels)
+            output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels, bit_depth)
             
         return output
 
