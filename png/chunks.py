@@ -62,12 +62,15 @@ class Chunk():
         self.data: bytearray or List[bytearray] = content
         self.processed_data: T = None
 
-    def process(self, **kwargs) -> None:
+    def process(self, **kwargs: dict) -> None:
         ''' Method processing a chunk according to its specification
+
+        Args:
+            dict:
+                Dictionary of arguments used to pass it to the processing function
         '''
 
         try:
-
             if self.corrupted:
                 raise ValueError("Chunk is corrupted. Cannot process")
             
@@ -105,6 +108,16 @@ class Chunk():
     ### Processing methods
 
     def process_IHDR(self, arguments: dict) -> dict:
+        ''' Method used to process IHDR chunk
+
+        Args:
+            dict:
+                Dictionary of arguments
+
+        Returns:
+            Dictinary with converted values of IHDR chunk's sections
+        '''
+        
         if len(arguments) == 0:
             pass
 
@@ -120,6 +133,16 @@ class Chunk():
         return decoded_values
 
     def process_PLTE(self, arguments: dict) -> List[dict]:
+        ''' Method used to process PLTE chunk
+
+        Args:
+            dict:
+                Dictionary of arguments
+
+        Returns:
+            List of dictinaries with converted colour values {red, green, blue}
+        '''
+
         if len(self.data) % 3 != 0:
             raise ValueError(f"PLTE chunk length should be divisible by 3 but is {len(self.data)}")
 
@@ -138,6 +161,15 @@ class Chunk():
         return decoded_values
 
     def __decompress_zlib_datastream(self, arguments: dict) -> bytearray:
+        ''' Method used to decompress zlib datastream
+
+        Args:
+            dict:
+                Dictionary of arguments
+
+        Returns:
+            bytearray of decompressed datastream
+        '''
         compression_method = arguments["IHDR_values"].processed_data["compression_method"]
         if compression_method != 0:
             raise ValueError(f"Only compression method {compression_method} is defined by the standard")
@@ -146,6 +178,21 @@ class Chunk():
         return zlib.decompress(zlib_datastream)
 
     def __calculate_bytes_per_pixel(self, arguments: dict, num_channels: int) -> int:
+        ''' Calculates how many bytes describing a pixel
+
+        Outcome value depends on the bit depth. If bit depth is smaller than 8,
+        it is assumed that the bytes per pixel value is equal to 1.
+
+        Args:
+            dict:
+                Dictionary of arguments
+            int:
+                Number of image's channels
+
+        Returns:
+            number of bytes per pixel
+        '''
+        
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
         bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
 
@@ -165,6 +212,17 @@ class Chunk():
 
     @staticmethod
     def __paeth_predictor(a: int, b: int, c: int) -> int:
+        ''' Returns a value of the Paeth's predictor
+        
+        Args:
+            int:
+                a: byte to the left of the current one
+                b: byte above the current one
+                c: upper left byte to the current one
+
+        Returns:
+            Paeth's descriptor value
+        '''
         p = a + b - c
         pa = abs(p - a)
         pb = abs(p - b)
@@ -179,6 +237,20 @@ class Chunk():
         return Pr
 
     def __reconstruct_scanline(self, to_reconstruct: bytearray, prior_scanline: bytearray, bytes_per_pixel: int, filter_flag: int) -> np.ndarray:
+        ''' Calculates inverse filtering of scanlines to reconstruct
+
+        Args:
+            bytearray:
+                to_reconstruct: filtered scanline
+                prior_scanline: scanline above the current one, already inverse filtered
+            int:
+                bytes_per_pixel: Number of bytes per pixel
+                filter_flag: Number depicting which filter type should be used
+        
+        Returns:
+            numpy array of the reconstructed bytearray
+        '''
+
         reconstructed = np.zeros(len(to_reconstruct))
         modulo_value = 256
 
@@ -208,10 +280,36 @@ class Chunk():
 
     @staticmethod
     def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int) -> np.ndarray:
+        ''' Reshaping scanline to row of pixels
+
+        Args:
+            np.ndarray:
+                scanline: scanline to convert to pixels
+            int:
+                num_channels: Number of channels
+
+        Returns:
+            numpy array of row of pixels
+        '''
         output = scanline.reshape((-1, num_channels))
         return output
 
     def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int, num_channels: int) -> np.ndarray:
+        ''' Converts decompressed bytearray to numpy array of pixels
+
+        Args:
+            dict:
+                arguments: Arguments passed by the outside function
+            bytearray:
+                decompressed: bytearray decompressed by zlib
+            int:
+                bytes_per_pixel: Number of bytes per pixel
+                num_channels: Number of channels
+
+        Returns:
+            numpy array of pixels
+        '''
+        
         image_height = arguments["IHDR_values"].processed_data["height"]
         image_width = arguments["IHDR_values"].processed_data["width"]
 
@@ -229,18 +327,23 @@ class Chunk():
         return output
 
     def process_IDAT(self, arguments: dict) -> np.ndarray:
+        ''' Processes IDAT chunk data
         
+        Args:
+            dict: 
+                arguments: Arguments passed by the outside function
+        
+        Returns:
+            numpy array of pixels
+        '''
         num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
 
         filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
 
-        # pixels = np.empty((image_height, image_width, num_channels_dict[colour_type]))
         decompressed = self.__decompress_zlib_datastream(arguments)
         bytes_per_pixel = self.__calculate_bytes_per_pixel(arguments, num_channels_dict[colour_type])
 
-        # Single scanline consists of 1 byte depicting which filtering was used
-        # The rest of the scanline is data to be treated with inverse filter
         if filtering_method != 0:
             raise ValueError(f"Only filter method 0 is defined by the standard not {filtering_method}")
         
@@ -314,17 +417,25 @@ class Chunk():
     ### Displaying methods
 
     def display_IHDR(self) -> None:
+        ''' Method used to display processed IHDR chunk data
+        '''
+        
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
     
     def display_PLTE(self) -> None:
+        ''' Method used to display processed PLTE chunk data
+        '''
+
         for colour in self.processed_data:
             print(colour)
 
     def display_IDAT(self) -> None:
+        ''' Method used to display processed IDAT chunk data
+        '''
+
         plt.imshow(self.processed_data)
         plt.show()
-        #print("Displaying IDAT...")
 
     def display_IEND(self) -> None:
         pass

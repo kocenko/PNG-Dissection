@@ -59,6 +59,13 @@ class PNG:
         return True if self.__data[:8] == self.signature else False
 
     def __check_ordering(self, chunk_type: str) -> None:
+        ''' Checks if requirements about chunk ordering are met
+        
+        Args:
+            str:
+                chunk type name
+        '''
+
         match chunk_type:
             case "IHDR":
                 if any(self.chunks[chunk] != None for chunk in PNG.list_of_chunks):
@@ -203,6 +210,10 @@ class PNG:
 
     def display_chunk(self, chunk_type: str) -> None:
         ''' Displays processed chunk
+
+        Args:
+            str:
+                chunk type name
         '''
 
         if chunk_type not in self.chunks.keys():
