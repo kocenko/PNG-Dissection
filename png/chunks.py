@@ -4,6 +4,7 @@ import itertools
 import zlib
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 T = TypeVar('T')
@@ -86,7 +87,7 @@ class Chunk():
         '''
 
         try:
-            if self.processed_data == None:
+            if self.processed_data is None:
                 raise ValueError("Chunk has not been processed yet")
             
             if self.name not in self.displaying_logic:    
@@ -165,65 +166,72 @@ class Chunk():
     @staticmethod
     def __paeth_predictor(a: int, b: int, c: int) -> int:
         p = a + b - c
-        pa = np.abs(p - a)
-        pb = np.abs(p - b)
-        pc = np.abs(p - c)
+        pa = abs(p - a)
+        pb = abs(p - b)
+        pc = abs(p - c)
 
         if pa <= pb and pa <= pc:
-            return a
+            Pr = a
         elif pb <= pc:
-            return b
+            Pr = b
         else:
-            return c
+            Pr = c
+        return Pr
 
-    def __reconstruct_scanline(self, to_reconstruct: bytearray, prior_scanline: bytearray, filter_flag: int) -> bytearray:
-        reconstructed = bytearray(to_reconstruct)
+    def __reconstruct_scanline(self, to_reconstruct: bytearray, prior_scanline: bytearray, bytes_per_pixel: int, filter_flag: int) -> np.ndarray:
+        reconstructed = np.zeros(len(to_reconstruct))
         modulo_value = 256
-        match filter_flag:
-            case 0:
-                return to_reconstruct
-            case 1:
-                for i in range(len(to_reconstruct)):
-                    recon_a = reconstructed[i-1] if i > 0 else 0
-                    reconstructed[i] = (to_reconstruct[i] + recon_a) % modulo_value
-            case 2:
-                for i in range(len(to_reconstruct)):
-                    recon_b = prior_scanline[i]
-                    reconstructed[i] = (to_reconstruct[i] + recon_b) % modulo_value
-            case 3:
-                for i in range(len(to_reconstruct)):
-                    recon_a = reconstructed[i-1] if i > 0 else 0
-                    recon_b = prior_scanline[i]
-                    reconstructed[i] = (to_reconstruct[i] + math.floor((recon_a + recon_b) / 2)) % modulo_value
-            case 4:
-                for i in range(len(to_reconstruct)):
-                    recon_a = reconstructed[i-1] if i > 0 else 0
-                    recon_b = prior_scanline[i]
-                    recon_c = prior_scanline[i-1] if i > 0 else 0
-                    reconstructed[i] = (to_reconstruct[i] + self.__paeth_predictor(recon_a, recon_b, recon_c)) % modulo_value
-            case _:
-                raise ValueError(f"Invalid filter flag: {filter_flag}")
+
+        for i in range(len(to_reconstruct)):
+            current_byte = to_reconstruct[i]
+            prior_byte = reconstructed[i-bytes_per_pixel] if i >= bytes_per_pixel else 0
+            prior_scanline_byte = prior_scanline[i]
+            prior_scanline_prior_byte = prior_scanline[i-bytes_per_pixel] if i >= bytes_per_pixel else 0
+
+            match filter_flag:
+                case 0:
+                    reconstructed_byte = current_byte
+                case 1:
+                    reconstructed_byte = (current_byte + prior_byte) % modulo_value
+                case 2:
+                    reconstructed_byte = (current_byte + prior_scanline_byte) % modulo_value
+                case 3:
+                    reconstructed_byte = (current_byte + (prior_byte + prior_scanline_byte) // 2) % modulo_value
+                case 4:
+                    reconstructed_byte = (current_byte + self.__paeth_predictor(prior_byte, prior_scanline_byte, prior_scanline_prior_byte)) % modulo_value
+                case _:
+                    raise ValueError(f"Invalid filter flag: {filter_flag}")
             
+            reconstructed[i] = reconstructed_byte
+
         return reconstructed
 
-    def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int) -> None:
+    @staticmethod
+    def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int) -> np.ndarray:
+        output = scanline.reshape((-1, num_channels))
+        return output
+
+    def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int, num_channels: int) -> np.ndarray:
         image_height = arguments["IHDR_values"].processed_data["height"]
         image_width = arguments["IHDR_values"].processed_data["width"]
 
-        output = []
+        output = np.empty((image_height, image_width, num_channels), dtype=np.uint8)
 
         prior_scanline = bytearray(image_width * bytes_per_pixel + 1)
         for i in range(image_height):
             scanline_begin = i * (image_width * bytes_per_pixel + 1)
             scanline_end = scanline_begin + (image_width * bytes_per_pixel + 1)
             filter_flag = utils.bytes_to_int(decompressed[scanline_begin: scanline_begin+1])
-            single_scanline = decompressed[scanline_begin+1: scanline_end]
-            prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, filter_flag)
-            output.append(prior_scanline)
+            single_scanline = bytearray(decompressed[scanline_begin+1: scanline_end])
+            prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, bytes_per_pixel, filter_flag)
+            output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels)
+            
+            if i == 144 or i == 185 or i == 188 or i == 203 or i == 205:
+                print(filter_flag)
 
         return output
 
-    def process_IDAT(self, arguments: dict) -> None:
+    def process_IDAT(self, arguments: dict) -> np.ndarray:
         
         num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 5: 4}
 
@@ -239,7 +247,7 @@ class Chunk():
         if filtering_method != 0:
             raise ValueError(f"Only filter method 0 is defined by the standard not {filtering_method}")
         
-        print(len(self.__reconstruct_pixels(arguments, decompressed, bytes_per_pixel)))
+        return self.__reconstruct_pixels(arguments, decompressed, bytes_per_pixel, num_channels_dict[colour_type])
                 
 
     def process_IEND(self, arguments: dict) -> None:
@@ -317,7 +325,8 @@ class Chunk():
             print(colour)
 
     def display_IDAT(self) -> None:
-        pass
+        plt.imshow(self.processed_data)
+        plt.show()
         #print("Displaying IDAT...")
 
     def display_IEND(self) -> None:
