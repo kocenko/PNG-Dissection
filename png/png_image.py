@@ -21,7 +21,7 @@ class PNG:
         self.processing_arguments_mapping = {
             'IHDR': {},
             'PLTE': {"IHDR_values": lambda: self.chunks["IHDR"]},
-            'IDAT': {"IHDR_values": lambda: self.chunks["IHDR"]}
+            'IDAT': {"IHDR_values": lambda: self.chunks["IHDR"], "PLTE_values": lambda: self.chunks["PLTE"]}
         }
 
     def __read_file(self) -> bytearray:

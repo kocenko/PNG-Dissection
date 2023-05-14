@@ -132,7 +132,7 @@ class Chunk():
 
         return decoded_values
 
-    def process_PLTE(self, arguments: dict) -> List[dict]:
+    def process_PLTE(self, arguments: dict) -> np.ndarray:
         ''' Method used to process PLTE chunk
 
         Args:
@@ -140,7 +140,7 @@ class Chunk():
                 Dictionary of arguments
 
         Returns:
-            List of dictinaries with converted colour values {red, green, blue}
+            numpy array with converted colour values [red, green, blue]
         '''
 
         if len(self.data) % 3 != 0:
@@ -150,13 +150,13 @@ class Chunk():
         if len(self.data) // 3 > 2**bit_depth:
             raise ValueError(f"Number of palette entries: {len(self.data) // 3} exceeds range defined by the bit depth: {2**bit_depth}")
 
-        decoded_values = []
+        decoded_values = np.empty((len(self.data) // 3, 3), dtype=np.uint8)
         for i in range(0, len(self.data), 3):
-            single_dict = {}
-            single_dict["red"] = self.data[i]
-            single_dict["green"] = self.data[i+1]
-            single_dict["blue"] = self.data[i+2]
-            decoded_values.append(single_dict)
+            single_row = np.empty(3, dtype=np.uint8)
+            single_row[0] = self.data[i]
+            single_row[1] = self.data[i+1]
+            single_row[2] = self.data[i+2]
+            decoded_values[i // 3] = single_row
             
         return decoded_values
 
@@ -281,7 +281,7 @@ class Chunk():
         return reconstructed
 
     @staticmethod
-    def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int, bit_depth: int, colour_type: int) -> np.ndarray:
+    def __scanline_to_pixel_row(scanline: np.ndarray, num_channels: int, arguments: dict) -> np.ndarray:
         ''' Reshaping scanline to row of pixels
 
         Args:
@@ -289,24 +289,32 @@ class Chunk():
                 scanline: scanline to convert to pixels
             int:
                 num_channels: Number of channels
-                bit_depth: Number indicating bit depth
-                colour_type: Number indicating colour type
+            dict:
+                arguments: Dictionary of arguments passed by the outside function
 
         Returns:
             numpy array of row of pixels
         '''
+
+        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
+        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
+        colour_palette = arguments["PLTE_values"].processed_data
+
         output = scanline.copy()
-        
         if bit_depth < 8:
             num_bits = 8 // bit_depth
+            palette_nums = np.empty(len(output) * num_bits, dtype=np.uint8)
             for i, b in enumerate(scanline):
-                output[i: i+num_bits] = utils.split_bytes_to_bits(int(b), num_bits)
+                bytes_in_bits = utils.split_bytes_to_bits(int(b), num_bits)
+                palette_nums[i*num_bits: i*num_bits+num_bits] = bytes_in_bits
 
         if colour_type != 3:
             output = output.reshape((-1, num_channels))
         else:
-            output = output  # Change to the values from the PLTE
-        
+            output = np.empty((len(palette_nums), 3), dtype=np.uint8)
+            for i in range(len(output)):
+                output[i] = colour_palette[palette_nums[i]]
+
         return output
 
     def __reconstruct_pixels(self, arguments: dict, decompressed: bytearray, bytes_per_pixel: int, num_channels: int) -> np.ndarray:
@@ -327,8 +335,6 @@ class Chunk():
         
         image_height = arguments["IHDR_values"].processed_data["height"]
         image_width = arguments["IHDR_values"].processed_data["width"]
-        bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
-        colour_type = arguments["IHDR_values"].processed_data["colour_type"]
 
         output = np.empty((image_height, image_width, num_channels), dtype=np.uint8)
 
@@ -342,7 +348,7 @@ class Chunk():
             filter_flag = decompressed[scanline_begin]
             single_scanline = bytearray(decompressed[scanline_begin+1: scanline_end])
             prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, bytes_per_pixel, filter_flag)
-            output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels, bit_depth)
+            output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels, arguments)[:image_width]
             
         return output
 
@@ -356,7 +362,7 @@ class Chunk():
         Returns:
             numpy array of pixels
         '''
-        num_channels_dict = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+        num_channels_dict = {0: 1, 2: 3, 3: 3, 4: 2, 6: 4}  # Note! colour_type 3 has also 3 channels after applying colours from the palette
 
         filtering_method = arguments["IHDR_values"].processed_data["filter_method"]
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
@@ -459,7 +465,7 @@ class Chunk():
         '''
 
         for colour in self.processed_data:
-            print(colour)
+            print(f"Red: {colour[0]}, Green: {colour[1]}, Blue: {colour[2]}")
 
     def display_IDAT(self) -> None:
         ''' Method used to display processed IDAT chunk data
