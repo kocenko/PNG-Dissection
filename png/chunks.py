@@ -226,9 +226,6 @@ class Chunk():
             prior_scanline = self.__reconstruct_scanline(single_scanline, prior_scanline, bytes_per_pixel, filter_flag)
             output[i] = self.__scanline_to_pixel_row(prior_scanline, num_channels)
             
-            if i == 144 or i == 185 or i == 188 or i == 203 or i == 205:
-                print(filter_flag)
-
         return output
 
     def process_IDAT(self, arguments: dict) -> np.ndarray:
