@@ -347,12 +347,23 @@ class Chunk():
         if filtering_method != 0:
             raise ValueError(f"Only filter method 0 is defined by the standard not {filtering_method}")
         
-        return self.__reconstruct_pixels(arguments, decompressed, bytes_per_pixel, num_channels_dict[colour_type])
-                
+        return self.__reconstruct_pixels(arguments, decompressed, bytes_per_pixel, num_channels_dict[colour_type])            
 
-    def process_IEND(self, arguments: dict) -> None:
-        pass
-        #print("Processing IEND...")
+    def process_IEND(self, arguments: dict) -> bool:
+        ''' Processes IEND chunk
+        
+        Args:
+            dict:
+                arguments: Dictionary of arguments passed by the outside funtion
+
+        Returns:
+            True if the chunk is not corrupted, False otherwise
+        '''
+
+        if len(arguments) == 0:
+            pass
+
+        return not self.corrupted
 
     def process_cHRM(self, arguments: dict) -> None:
         pass
@@ -438,8 +449,7 @@ class Chunk():
         plt.show()
 
     def display_IEND(self) -> None:
-        pass
-        #print("Displaying IEND...")
+        print("Chunk IEND was read correctly")
 
     def display_cHRM(self) -> None:
         pass

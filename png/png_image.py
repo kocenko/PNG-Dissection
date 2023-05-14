@@ -216,11 +216,14 @@ class PNG:
                 chunk type name
         '''
 
-        if chunk_type not in self.chunks.keys():
-            raise ValueError(f"Could not display chunk {chunk_type}, not in the list")
-        
-        if not self.is_chunk_read(chunk_type):
-            raise ValueError(f"Could not display chunk {chunk_type}, it was not read")
+        try:
+            if chunk_type not in self.chunks.keys():
+                raise ValueError(f"Could not display chunk {chunk_type}, not in the list")
+            
+            if not self.is_chunk_read(chunk_type):
+                raise ValueError(f"Could not display chunk {chunk_type}, it was not read")
 
-        self.chunks[chunk_type].display()
+            self.chunks[chunk_type].display()
+        except Exception as e:
+            print(e)
 
