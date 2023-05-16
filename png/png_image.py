@@ -1,5 +1,8 @@
+import os.path
+
 from png import chunks
 from png import utils
+from os import path
 import zlib
 
 
@@ -8,8 +11,8 @@ class PNG:
     signature = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
     multiple_chunks_allowed_for = ["IDAT", "sPLT", "iTXt", "tEXt", "zTXt"]
 
-    def __init__(self, file_name: str):
-        self.__file_name = file_name
+    def __init__(self, file_path: str):
+        self.__img_path = file_path
         self.__data = self.__read_file()
         self.chunks = self.__init_chunks()
         
@@ -31,7 +34,7 @@ class PNG:
             Returns a list of bytes read from the file
         '''
 
-        with open(self.__file_name, 'rb') as file:
+        with open(self.__img_path, 'rb') as file:
             bytes = file.read()
 
         return bytes
@@ -168,13 +171,13 @@ class PNG:
 
             if chunk_type in PNG.multiple_chunks_allowed_for:
                 if self.chunks[chunk_type] == None:
-                    self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, [chunk_data], crc != actual_crc)
+                    self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, [chunk_data], crc, crc != actual_crc)
                 else:
                     self.chunks[chunk_type].data.append(chunk_data)
             else:
                 if self.chunks[chunk_type] != None:
                     raise KeyError(f"Chunk {chunk_type} does not allow multiple instances")
-                self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, chunk_data, crc != actual_crc)
+                self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, chunk_data, crc, crc != actual_crc)
 
             i = i+8+length+4
 
@@ -227,3 +230,35 @@ class PNG:
         except Exception as e:
             print(e)
 
+    def __clear_ancillaries(self) -> bytearray:
+        cleared_image = b'\x89\x50\x4E\x47\x0D\x0A\x1A\x0A'  # PNG magic number
+
+        cleared_image += (self.chunks["IHDR"].length.to_bytes(length=4, byteorder='big') +
+                          self.chunks["IHDR"].identifier +
+                          self.chunks["IHDR"].data +
+                          self.chunks["IHDR"].crc.to_bytes(length=4, byteorder='big'))
+
+        if self.chunks["PLTE"] is not None:
+            cleared_image += (self.chunks["PLTE"].length.to_bytes(length=4, byteorder='big') +
+                              self.chunks["PLTE"].identifier +
+                              self.chunks["PLTE"].data +
+                              self.chunks["PLTE"].crc.to_bytes(length=4, byteorder='big'))
+
+        cleared_image += (self.chunks["IDAT"].length.to_bytes(length=4, byteorder='big') +
+                          self.chunks["IDAT"].identifier +
+                          b''.join(self.chunks["IDAT"].data) +
+                          self.chunks["IDAT"].crc.to_bytes(length=4, byteorder='big'))
+
+        cleared_image += b'\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82'  # IEND chunk
+
+        return cleared_image
+
+    def __save_to_file(self, file_name: str, image: bytearray) -> None:
+        with open("imgs/processed/" + file_name, "wb") as output_file:
+            output_file.write(image)
+
+    def anonymize(self, save_file: bool = True) -> bytearray:
+        anonymized = self.__clear_ancillaries()
+        if save_file:
+            self.__save_to_file("anonymized_" + os.path.basename(self.__img_path), anonymized)
+        return anonymized

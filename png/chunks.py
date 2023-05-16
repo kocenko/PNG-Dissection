@@ -55,11 +55,13 @@ class Chunk():
         "zTXt": "display_zTXt",
     }
 
-    def __init__(self, length: int, name: str, content: bytearray or List[bytearray], corrupted: bool):
+    def __init__(self, length: int, name: str, content: bytearray or List[bytearray], crc: bytearray, corrupted: bool):
         self.corrupted: bool = corrupted
+        self.identifier: bytearray = utils.string_to_bytes(name)
         self.length: int = length
         self.name: str = name
         self.data: bytearray or List[bytearray] = content
+        self.crc: bytearray = crc
         self.processed_data: T = None
 
     def process(self, **kwargs: dict) -> None:
@@ -471,6 +473,7 @@ class Chunk():
         ''' Method used to display processed IDAT chunk data
         '''
 
+        plt.figure(figsize=(3, 3))
         plt.imshow(self.processed_data)
         plt.show()
 
@@ -531,3 +534,9 @@ class Chunk():
     def display_zTXt(self) -> None:
         pass
         #print("Displaying zTXt...")
+
+    def __str__(self):
+        return f'Chunk data: {self.data}'
+
+    def __len__(self):
+        return self.length

@@ -26,6 +26,18 @@ def bytes_to_string(bytes: bytearray) -> str:
     bytes_as_string = "".join(map(chr, bytes))
     return bytes_as_string
 
+def string_to_bytes(string: str) -> bytearray:
+    """ Converts string to bytearray
+
+    Args:
+        string:
+            string to convert
+    Returns:
+        Converted bytearray
+    """
+    string_as_bytes = string.encode('utf-8')
+    return string_as_bytes
+
 def split_bytes_to_bits(byte: bytes or int, how_many: int) -> np.ndarray:
     if how_many not in [1, 2, 4, 8]:
         raise ValueError(f"Cannot split byte into {how_many} bits")
