@@ -465,9 +465,25 @@ class Chunk():
     def display_PLTE(self) -> None:
         ''' Method used to display processed PLTE chunk data
         '''
+        grayscale_start = 999_999
+        colours = np.empty((0, 3), dtype='int16')
+        for i, colour in enumerate(self.processed_data):
+            if colour[0] == colour[1] and colour[0] == colour[2]:
+                grayscale_start = min(grayscale_start, i)
+            colours = np.vstack([colours, colour])  # R,G,B
 
-        for colour in self.processed_data:
-            print(f"Red: {colour[0]}, Green: {colour[1]}, Blue: {colour[2]}")
+        plt.figure(figsize=(10, 10))
+        plt.imshow([colours[:grayscale_start]])
+
+        plt.axis('off')
+        plt.show()
+
+        # if grayscale_start != 999_999:  # if there is gray pallete
+        #     print("Pallete of gray colours has been registered:")
+        #     plt.figure(figsize=(10, 10))
+        #     plt.imshow([colours[grayscale_start:]])
+        #     plt.axis('off')
+        #     plt.show()
 
     def display_IDAT(self) -> None:
         ''' Method used to display processed IDAT chunk data
