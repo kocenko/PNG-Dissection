@@ -81,7 +81,7 @@ class Chunk():
             
             if self.name not in self.processing_logic:    
                 raise NotImplementedError(f"Processing for {self.name} was not implemented yet")
-            
+
             self.processed_data = getattr(self, Chunk.processing_logic[self.name])(kwargs)
         
         except Exception as e:
@@ -397,17 +397,61 @@ class Chunk():
         pass
         #print("Processing cHRM...")
 
-    def process_gAMA(self, arguments: dict) -> None:
-        pass
-        #print("Processing gAMA...")
+    def process_gAMA(self, arguments: dict) -> np.ndarray:
+        if len(arguments) == 0:
+            pass
 
-    def process_iCCP(self, arguments: dict) -> None:
-        pass
-        #print("Processing iCCP...")
+        decoded_values = {"Gamma": utils.bytes_to_int(self.data) / 100000}
 
-    def process_sBIT(self, arguments: dict) -> None:
-        pass
-        #print("Processing sBIT...")
+        return decoded_values
+
+    def process_iCCP(self, arguments: dict) -> np.ndarray:
+        if len(arguments) == 0:
+            pass
+
+        profile_name = b""
+        name_end = 0
+        for i, ch in enumerate(self.data):
+            if ch == 0:
+                profile_name = self.data[:i]
+                name_end = i
+                break
+
+        method = self.data[name_end+1]
+        profile = self.data[name_end+2:]
+
+        decoded_values = {"Profile name": utils.bytes_to_string(profile_name),
+                          "Compression method": method,
+                          "Compressed profile size": len(profile)
+        }
+
+        return decoded_values
+
+    def process_sBIT(self, arguments: dict) -> np.ndarray:
+        if len(arguments) == 0:
+            pass
+
+        decoded_values = {}
+        bytes_count = len(self.data)
+        match bytes_count:
+            case 1:
+                decoded_values["grayscale"] = utils.bytes_to_int(self.data)
+            case 2:
+                decoded_values["grayscale"] = utils.bytes_to_int(self.data[0:1])
+                decoded_values["alpha channel"] = utils.bytes_to_int(self.data[1:2])
+            case 3:
+                decoded_values["red"] = utils.bytes_to_int(self.data[0:1])
+                decoded_values["green"] = utils.bytes_to_int(self.data[1:2])
+                decoded_values["blue"] = utils.bytes_to_int(self.data[2:3])
+            case 4:
+                decoded_values["red"] = utils.bytes_to_int(self.data[0:1])
+                decoded_values["green"] = utils.bytes_to_int(self.data[1:2])
+                decoded_values["blue"] = utils.bytes_to_int(self.data[2:3])
+                decoded_values["alpha channel"] = utils.bytes_to_int(self.data[3:4])
+            case _:
+                print("the sBIT chunk is corrupted")
+
+        return decoded_values
 
     def process_sRGB(self, arguments: dict) -> None:
         pass
@@ -426,8 +470,22 @@ class Chunk():
         #print("Processing tRNS...")
 
     def process_pHYs(self, arguments: dict) -> None:
-        pass
-        #print("Processing pHYs...")
+        if len(arguments) == 0:
+            pass
+
+        xAxis = self.data[0:4]
+        yAxis = self.data[4:8]
+        unit = utils.bytes_to_int(self.data[8:9])
+
+        decoded_values = {"Pixels per unit, X axis": utils.bytes_to_int(xAxis),
+                          "Pixels per unit, Y axis": utils.bytes_to_int(yAxis),
+        }
+        if unit == 0:
+            decoded_values["Unit specifier"] = "no unit, ratio only."
+        elif unit == 1:
+            decoded_values["Unit specifier"] = "metre"
+
+        return decoded_values
 
     def process_sPLT(self, arguments: dict) -> None:
         pass
@@ -458,7 +516,7 @@ class Chunk():
     def display_IHDR(self) -> None:
         ''' Method used to display processed IHDR chunk data
         '''
-        
+
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
     
@@ -501,16 +559,17 @@ class Chunk():
         #print("Displaying cHRM...")
 
     def display_gAMA(self) -> None:
-        pass
-        #print("Displaying gAMA...")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_iCCP(self) -> None:
-        pass
-        #print("Displaying iCCP...")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_sBIT(self) -> None:
-        pass
-        #print("Displaying sBIT...")
+        print("Number of significant bits used to represent:")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_sRGB(self) -> None:
         pass
@@ -529,8 +588,8 @@ class Chunk():
         #print("Displaying tRNS...")
 
     def display_pHYs(self) -> None:
-        pass
-        #print("Displaying pHYs...")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_sPLT(self) -> None:
         pass
