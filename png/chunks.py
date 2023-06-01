@@ -394,8 +394,18 @@ class Chunk():
         return not self.corrupted
 
     def process_cHRM(self, arguments: dict) -> None:
-        pass
-        #print("Processing cHRM...")
+        if len(arguments) == 0:
+            pass
+
+        decoded_values = {}
+        labels = ["White point x", "White point y", "Red x", "Red y", "Green x", "Green y", "Blue x", "Blue y"]
+        values = [self.data[i:i+4] for i in range(0, len(self.data), 4)]
+
+        for i, l in enumerate(labels):
+            print(i ,l)
+            decoded_values[l] = utils.bytes_to_int(values[i]) / 100000
+
+        return decoded_values
 
     def process_gAMA(self, arguments: dict) -> np.ndarray:
         if len(arguments) == 0:
@@ -458,8 +468,24 @@ class Chunk():
         #print("Processing sRGB...")
 
     def process_bKGD(self, arguments: dict) -> None:
-        pass
-        #print("Processing bKGD...")
+        if len(arguments) == 0:
+            pass
+
+        decoded_values = {}
+        bytes_count = len(self.data)
+        match bytes_count:
+            case 1:
+                decoded_values["pallete index"] = utils.bytes_to_int(self.data)
+            case 2:
+                decoded_values["gray level"] = utils.bytes_to_int(self.data)
+            case 6:
+                decoded_values["red"] = utils.bytes_to_int(self.data[0:2])
+                decoded_values["green"] = utils.bytes_to_int(self.data[2:4])
+                decoded_values["blue"] = utils.bytes_to_int(self.data[4:6])
+            case _:
+                print("the bKGD chunk is corrupted")
+
+        return decoded_values
 
     def process_hIST(self, arguments: dict) -> None:
         pass
@@ -519,7 +545,7 @@ class Chunk():
 
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
-    
+
     def display_PLTE(self) -> None:
         ''' Method used to display processed PLTE chunk data
         '''
@@ -555,14 +581,17 @@ class Chunk():
         print("Chunk IEND was read correctly")
 
     def display_cHRM(self) -> None:
-        pass
-        #print("Displaying cHRM...")
+        print("Information about the chromaticity (color) characteristics of the image:")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_gAMA(self) -> None:
+        print("Gamma correction info:")
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
 
     def display_iCCP(self) -> None:
+        print("Information about the color space and characteristics of the image.")
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
 
@@ -576,8 +605,9 @@ class Chunk():
         #print("Displaying sRGB...")
 
     def display_bKGD(self) -> None:
-        pass
-        #print("Displaying bKGD...")
+        print("Information about the background color of the image.")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_hIST(self) -> None:
         pass
@@ -588,6 +618,7 @@ class Chunk():
         #print("Displaying tRNS...")
 
     def display_pHYs(self) -> None:
+        print("Information about the physical size and resolution of the image.")
         for key in self.processed_data:
             print(f"{key} : {self.processed_data[key]}")
 
