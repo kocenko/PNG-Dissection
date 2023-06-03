@@ -1,10 +1,12 @@
 import os.path
 
+import numpy as np
 from png import chunks
 from png import utils
-from os import path
-import zlib
+from PIL import Image
 
+import zlib
+import matplotlib.pyplot as plt
 
 class PNG:
     list_of_chunks = chunks.critical_chunks + chunks.ancillary_chunks
@@ -165,8 +167,9 @@ class PNG:
             actual_crc = zlib.crc32(data_rest[i+4:i+8+length])
 
             if chunk_type not in self.chunks.keys():
-                raise ValueError(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
-            
+                print(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
+                return None
+
             self.__check_ordering(chunk_type)
 
             if chunk_type in PNG.multiple_chunks_allowed_for:
@@ -262,3 +265,46 @@ class PNG:
         if save_file:
             self.__save_to_file("anonymized_" + os.path.basename(self.__img_path), anonymized)
         return anonymized
+
+    def fourier_transform(self):
+        image = Image.open(self.__img_path)
+        gray = image.convert("L")
+
+        np_image = np.asarray(gray, dtype=np.uint8)
+        fft_image = np.fft.fft2(np_image)  # 2 dimensional fft
+        fft_shifted = np.fft.fftshift(fft_image)
+
+        magnitude = 20 * np.log10(np.abs(fft_shifted))
+        phase = np.angle(fft_shifted)
+
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+
+        ax1.imshow(magnitude, cmap='gray')
+        ax1.set_title('Magnitude')
+        ax1.axis('off')
+
+        ax2.imshow(phase, cmap='gray')
+        ax2.set_title('Phase')
+        ax2.axis('off')
+
+        plt.show()
+
+        return fft_shifted
+
+    def inverse_fourier(self, transform):
+        inv_shift = np.fft.ifftshift(transform)
+        inv_fourier = np.fft.ifftn(inv_shift)
+        image = abs(inv_fourier)
+        original_img = Image.open(self.__img_path).convert("L")
+
+        fig, (ax1, ax2) = plt.subplots(1, 2)
+
+        ax1.imshow(image, cmap='gray')
+        ax1.set_title('Reconstructed image')
+        ax1.axis('off')
+
+        ax2.imshow(original_img, cmap='gray')
+        ax2.set_title('Original image')
+        ax2.axis('off')
+
+        plt.show()

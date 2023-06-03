@@ -402,7 +402,6 @@ class Chunk():
         values = [self.data[i:i+4] for i in range(0, len(self.data), 4)]
 
         for i, l in enumerate(labels):
-            print(i ,l)
             decoded_values[l] = utils.bytes_to_int(values[i]) / 100000
 
         return decoded_values
@@ -488,8 +487,12 @@ class Chunk():
         return decoded_values
 
     def process_hIST(self, arguments: dict) -> None:
-        pass
-        #print("Processing hIST...")
+        if len(arguments) == 0:
+            pass
+
+        values = [self.data[i:i + 2] for i in range(0, len(self.data), 2)]
+
+        return values
 
     def process_tRNS(self, arguments: dict) -> None:
         pass
@@ -610,8 +613,17 @@ class Chunk():
             print(f"{key} : {self.processed_data[key]}")
 
     def display_hIST(self) -> None:
-        pass
-        #print("Displaying hIST...")
+        print("Image histogram.")
+
+        data = [utils.bytes_to_int(freq) for freq in self.processed_data]
+        bins = range(len(data))
+
+        plt.bar(bins, data)
+
+        plt.xlabel('Pallete colours')
+        plt.ylabel('Frequency')
+
+        plt.show()
 
     def display_tRNS(self) -> None:
         pass
