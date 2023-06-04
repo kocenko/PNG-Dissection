@@ -411,7 +411,7 @@ class Chunk():
         if len(arguments) == 0:
             pass
 
-        decoded_values = {"Gamma": utils.bytes_to_int(self.data) / 100000}
+        decoded_values = {"gamma": utils.bytes_to_int(self.data) / 100000}
 
         return decoded_values
 
@@ -464,8 +464,23 @@ class Chunk():
         return decoded_values
 
     def process_sRGB(self, arguments: dict) -> None:
-        pass
-        #print("Processing sRGB...")
+        if len(arguments) == 0:
+            pass
+        index = utils.bytes_to_int(self.data)
+        intend = ''
+
+        match index:
+            case 0:
+                intend = 'perceptual'
+            case 1:
+                intend = 'relative colorimetric'
+            case 2:
+                intend = 'saturation'
+            case 3:
+                intend = 'absolute colorimetric'
+
+        decoded_values = {"rendering intend":  intend}
+        return decoded_values
 
     def process_bKGD(self, arguments: dict) -> None:
         if len(arguments) == 0:
@@ -576,7 +591,7 @@ class Chunk():
     def display_IDAT(self) -> None:
         ''' Method used to display processed IDAT chunk data
         '''
-
+        print("Number of IDAT chunks: " + str(len(self.data)))
         plt.figure(figsize=(3, 3))
         plt.imshow(self.processed_data)
         plt.show()
@@ -605,8 +620,9 @@ class Chunk():
             print(f"{key} : {self.processed_data[key]}")
 
     def display_sRGB(self) -> None:
-        pass
-        #print("Displaying sRGB...")
+        print("Information about used colour space:")
+        for key in self.processed_data:
+            print(f"{key} : {self.processed_data[key]}")
 
     def display_bKGD(self) -> None:
         print("Information about the background color of the image.")

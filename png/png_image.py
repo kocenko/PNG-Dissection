@@ -247,10 +247,11 @@ class PNG:
                               self.chunks["PLTE"].data +
                               self.chunks["PLTE"].crc.to_bytes(length=4, byteorder='big'))
 
-        cleared_image += (self.chunks["IDAT"].length.to_bytes(length=4, byteorder='big') +
-                          self.chunks["IDAT"].identifier +
-                          b''.join(self.chunks["IDAT"].data) +
-                          self.chunks["IDAT"].crc.to_bytes(length=4, byteorder='big'))
+        for data_block in self.chunks["IDAT"].data:
+            cleared_image += (len(data_block).to_bytes(length=4, byteorder='big') +
+                              self.chunks["IDAT"].identifier +
+                              data_block +
+                              zlib.crc32(data_block).to_bytes(length=4, byteorder='big'))
 
         cleared_image += b'\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82'  # IEND chunk
 
