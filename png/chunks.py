@@ -300,7 +300,6 @@ class Chunk():
 
         bit_depth = arguments["IHDR_values"].processed_data["bit_depth"]
         colour_type = arguments["IHDR_values"].processed_data["colour_type"]
-        colour_palette = arguments["PLTE_values"].processed_data
 
         output = scanline.copy()
         if bit_depth < 8:
@@ -313,6 +312,7 @@ class Chunk():
         if colour_type != 3:
             output = output.reshape((-1, num_channels))
         else:
+            colour_palette = arguments["PLTE_values"].processed_data
             output = np.empty((len(palette_nums), 3), dtype=np.uint8)
             for i in range(len(output)):
                 output[i] = colour_palette[palette_nums[i]]
@@ -371,6 +371,7 @@ class Chunk():
 
         decompressed = self.__decompress_zlib_datastream(arguments)
         bytes_per_pixel = self.__calculate_bytes_per_pixel(arguments, num_channels_dict[colour_type])
+
 
         if filtering_method != 0:
             raise ValueError(f"Only filter method 0 is defined by the standard not {filtering_method}")
