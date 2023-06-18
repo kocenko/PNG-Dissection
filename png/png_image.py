@@ -312,23 +312,31 @@ class PNG:
 
         plt.show()
 
-    def encrypt(self, public_key, save_file: bool = True, cipher_decompressed: bool = True):
+    def encrypt(self, public_key, mode: str = "ECB", save_file: bool = True, cipher_decompressed: bool = True):
         if self.is_chunk_read('IDAT'):
             plain_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
-            print(plain_data)
+            # print(plain_data)
 
             if cipher_decompressed:
                 plain_data = zlib.decompress(plain_data)
 
             # Encrypting block by block
-            block_size = 64
+            block_size = rsa.BLOCK_SIZE
             block_num = (len(plain_data) + block_size - 1) // block_size
             plain_list = [plain_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
             encrypted_list = []
-            for dat in plain_list:
-                encrypted_list.append(rsa.ecb_encrypt(dat, public_key))
-            enc_data = b''.join(encrypted_list)
+            if mode == "ECB":
+                for dat in plain_list:
+                    encrypted_list.append(rsa.ecb_encrypt(dat, public_key))
+                enc_data = b''.join(encrypted_list)
+            if mode == "CTR":
+                counter = 0
+                for dat in plain_list:
+                    encrypted_list.append(rsa.ctr_encrypt(dat, public_key, counter))
+                    counter += 1
+                enc_data = b''.join(encrypted_list)
+                print("ENCODED DATA LEN: " + str(len(enc_data)))
 
             if cipher_decompressed:
                 enc_data = zlib.compress(enc_data)
@@ -340,7 +348,7 @@ class PNG:
         if save_file:
             self.__save_to_file('encrypted.png', self.anonymize(False))
 
-    def decrypt(self, private_key, save_file: bool = True, cipher_decompressed: bool = True):
+    def decrypt(self, private_key, mode: str = "ECB", save_file: bool = True, cipher_decompressed: bool = True):
         if self.is_chunk_read('IDAT'):
             cipher_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
 
@@ -348,19 +356,28 @@ class PNG:
                 cipher_data = zlib.decompress(cipher_data)
 
             # Decrypting block by block
-            block_size = 256
+            block_size = rsa.BITS // 8
             block_num = (len(cipher_data) + block_size - 1) // block_size
             cipher_list = [cipher_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
             decrypted_list = []
-            for dat in cipher_list:
-                decrypted_list.append(rsa.ecb_decrypt(dat, private_key))
-            dec_data = b''.join(decrypted_list)
+            if mode == "ECB":
+                for dat in cipher_list:
+                    decrypted_list.append(rsa.ecb_decrypt(dat, private_key))
+                dec_data = b''.join(decrypted_list)
+            if mode == "CTR":
+                counter = 0
+                for dat in cipher_list:
+                    decrypted_list.append(rsa.ctr_encrypt(dat, private_key, counter))
+                    counter += 1
+                dec_data = b''.join(decrypted_list)
+                print("DECODED DATA LEN: " + str(len(dec_data)))
+
 
             if cipher_decompressed:
                 dec_data = zlib.compress(dec_data)
             dec_data = bytearray(dec_data)
-            print(dec_data)
+            # print(dec_data)
 
             self.chunks['IDAT'].data = [dec_data]
             self.chunks['IDAT'].length = len(dec_data)
