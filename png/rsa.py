@@ -57,10 +57,10 @@ def ecb_encrypt(bytes_str, public_key):
     e, n = public_key
     plaintext_int = int.from_bytes(bytes_str, byteorder="big")
     ciphertext = pow(plaintext_int, e, n)
-    bytes_to_return = ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, "big")  # Plus 7 is for rounding up
+    bytes_to_return = ciphertext.to_bytes(BITS // 8, "big")  # Plus 7 is for rounding up
 
-    if len(bytes_to_return) == 0:
-        bytes_to_return = BITS // 8 * b'\x00'
+    # if len(bytes_to_return) == 0:
+    #     bytes_to_return = BITS // 8 * b'\x00'
 
     return bytes_to_return
 
@@ -68,7 +68,7 @@ def ecb_decrypt(bytes_str, private_key):
     d, n = private_key
     ciphertext_int = int.from_bytes(bytes_str, byteorder="big")
     plaintext_bytes = pow(ciphertext_int, d, n)
-    return plaintext_bytes.to_bytes((plaintext_bytes.bit_length() + 7) // 8, "big")  # Plus 7 is for rounding up)
+    return plaintext_bytes.to_bytes(BLOCK_SIZE, "big")  # Plus 7 is for rounding up)
 
 if __name__ == '__main__':
     # priv, pub = generate_rsa_keys()
