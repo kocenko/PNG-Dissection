@@ -1,5 +1,6 @@
 import copy
 import os.path
+import itertools
 
 import numpy as np
 from png import chunks, utils, rsa
@@ -312,79 +313,134 @@ class PNG:
         plt.show()
 
     def encrypt(self, public_key, save_file: bool = True, cipher_decompressed: bool = True):
-        encrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
-        img_data = self.__data[8:]
+        if self.is_chunk_read('IDAT'):
+            plain_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
 
-        i = 0
-        while i < len(img_data):
-            length = utils.bytes_to_int(img_data[i:i + 4])
-            shift = length
-            chunk_type = img_data[i + 4:i + 8]
-            chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+            if cipher_decompressed:
+                plain_data = zlib.decompress(plain_data)
 
-            if utils.bytes_to_string(chunk_type) == "IDAT":
-                if cipher_decompressed:
-                    chunk_data = zlib.decompress(chunk_data)
-                length = len(chunk_data)
-                enc_data = b""
-                max_bytes = 64  # int(public_key.n.bit_length()/8-11)  # public key length - max encrypted data block size
-                for j in range(length // max_bytes + 1):
-                    # if (j + 1) * max_bytes >= len(chunk_data):
-                    #     enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], public_key)
-                    #     break
-                    enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], public_key)
-                if cipher_decompressed:
-                    chunk_data = zlib.compress(enc_data)
-                else:
-                    chunk_data = enc_data
-                length = len(chunk_data)
-            crc = zlib.crc32(chunk_type + chunk_data)
+            # Encrypting block by block
+            block_size = 64
+            block_num = (len(plain_data) + block_size - 1) // block_size
+            plain_list = [plain_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
-            encrypted_img += length.to_bytes(4, 'big')
-            encrypted_img += chunk_type
-            encrypted_img += chunk_data
-            encrypted_img += crc.to_bytes(4, 'big')
-            i = i + 8 + shift + 4
+            encrypted_list = []
+            for dat in plain_list:
+                encrypted_list.append(rsa.ecb_encrypt(dat, public_key))
+            enc_data = b''.join(encrypted_list)
+
+            if cipher_decompressed:
+                enc_data = zlib.compress(enc_data)
+
+            self.chunks['IDAT'].data = [enc_data]
+            self.chunks['IDAT'].length = len(enc_data)
+            self.chunks['IDAT'].crc = zlib.crc32(self.chunks['IDAT'].identifier + enc_data).to_bytes(4, 'big')
 
         if save_file:
-            with open("imgs/rsa/" + "encrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
-                output_file.write(encrypted_img)
+            self.__save_to_file('encrypted.png', self.anonymize(False))
+            # with open("imgs/rsa/" + "encrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
+            #     output_file.write(encrypted_img)
+
+            # enc_data_list = [enc_data[] for length in chunk_lengths]
+        # encrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        # img_data = self.__data[8:]
+
+        # i = 0
+        # while i < len(img_data):
+        #     length = utils.bytes_to_int(img_data[i:i + 4])
+        #     shift = length
+        #     chunk_type = img_data[i + 4:i + 8]
+        #     chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+
+        #     if utils.bytes_to_string(chunk_type) == "IDAT":
+        #         if cipher_decompressed:
+        #             chunk_data = zlib.decompress(chunk_data)
+        #         length = len(chunk_data)
+        #         enc_data = b""
+        #         max_bytes = 64  # int(public_key.n.bit_length()/8-11)  # public key length - max encrypted data block size
+        #         for j in range(length // max_bytes + 1):
+        #             # if (j + 1) * max_bytes >= len(chunk_data):
+        #             #     enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], public_key)
+        #             #     break
+        #             enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], public_key)
+        #         if cipher_decompressed:
+        #             chunk_data = zlib.compress(enc_data)
+        #         else:
+        #             chunk_data = enc_data
+        #         length = len(chunk_data)
+        #     crc = zlib.crc32(chunk_type + chunk_data)
+
+        #     encrypted_img += length.to_bytes(4, 'big')
+        #     encrypted_img += chunk_type
+        #     encrypted_img += chunk_data
+        #     encrypted_img += crc.to_bytes(4, 'big')
+        #     i = i + 8 + shift + 4
+
+        # if save_file:
+        #     with open("imgs/rsa/" + "encrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
+        #         output_file.write(encrypted_img)
 
     def decrypt(self, private_key, save_file: bool = True, cipher_decompressed: bool = True):
-        decrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
-        img_data = self.__data[8:]
+        if self.is_chunk_read('IDAT'):
+            cipher_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
 
-        i = 0
-        while i < len(img_data):
-            length = utils.bytes_to_int(img_data[i:i + 4])
-            shift = length
-            chunk_type = img_data[i + 4:i + 8]
-            chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+            if cipher_decompressed:
+                cipher_data = zlib.decompress(cipher_data)
 
-            if utils.bytes_to_string(chunk_type) == "IDAT":
-                if cipher_decompressed:
-                    chunk_data = zlib.decompress(chunk_data)
-                length = len(chunk_data)
-                dec_data = b""
-                max_bytes = 64  # private key length - encrypted data block size
-                for j in range(length // max_bytes + 1):
-                    # if (j + 1) * max_bytes >= len(chunk_data):
-                    #     dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], private_key)
-                    #     break
-                    dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], private_key)
-                if cipher_decompressed:
-                    chunk_data = zlib.compress(dec_data)
-                else:
-                    chunk_data = dec_data
-                length = len(chunk_data)
-            crc = zlib.crc32(chunk_type + chunk_data)
+            # Decrypting block by block
+            block_size = 64
+            block_num = (len(cipher_data) + block_size - 1) // block_size
+            cipher_list = [cipher_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
-            decrypted_img += length.to_bytes(4, 'big')
-            decrypted_img += chunk_type
-            decrypted_img += chunk_data
-            decrypted_img += crc.to_bytes(4, 'big')
-            i = i + 8 + shift + 4
+            decrypted_list = []
+            for dat in cipher_list:
+                decrypted_list.append(rsa.ecb_decrypt(dat, private_key))
+            dec_data = b''.join(decrypted_list)
+
+            if cipher_decompressed:
+                dec_data = zlib.compress(dec_data)
+
+            self.chunks['IDAT'].data = [dec_data]
+            self.chunks['IDAT'].length = len(dec_data)
+            self.chunks['IDAT'].crc = zlib.crc32(self.chunks['IDAT'].identifier + dec_data).to_bytes(4, 'big')
 
         if save_file:
-            with open("imgs/rsa/" + "decrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
-                output_file.write(decrypted_img)
+            self.__save_to_file('decrypted.png', self.anonymize(False))
+
+        # decrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        # img_data = self.__data[8:]
+
+        # i = 0
+        # while i < len(img_data):
+        #     length = utils.bytes_to_int(img_data[i:i + 4])
+        #     shift = length
+        #     chunk_type = img_data[i + 4:i + 8]
+        #     chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+
+        #     if utils.bytes_to_string(chunk_type) == "IDAT":
+        #         if cipher_decompressed:
+        #             chunk_data = zlib.decompress(chunk_data)
+        #         length = len(chunk_data)
+        #         dec_data = b""
+        #         max_bytes = 64  # private key length - encrypted data block size
+        #         for j in range(length // max_bytes + 1):
+        #             # if (j + 1) * max_bytes >= len(chunk_data):
+        #             #     dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], private_key)
+        #             #     break
+        #             dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], private_key)
+        #         if cipher_decompressed:
+        #             chunk_data = zlib.compress(dec_data)
+        #         else:
+        #             chunk_data = dec_data
+        #         length = len(chunk_data)
+        #     crc = zlib.crc32(chunk_type + chunk_data)
+
+        #     decrypted_img += length.to_bytes(4, 'big')
+        #     decrypted_img += chunk_type
+        #     decrypted_img += chunk_data
+        #     decrypted_img += crc.to_bytes(4, 'big')
+        #     i = i + 8 + shift + 4
+
+        # if save_file:
+        #     with open("imgs/rsa/" + "decrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
+        #         output_file.write(decrypted_img)
