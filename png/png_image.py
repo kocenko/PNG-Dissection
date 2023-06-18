@@ -1,12 +1,13 @@
+import copy
 import os.path
 
 import numpy as np
-from png import chunks
-from png import utils
+from png import chunks, utils, rsa
 from PIL import Image
 
 import zlib
 import matplotlib.pyplot as plt
+
 
 class PNG:
     list_of_chunks = chunks.critical_chunks + chunks.ancillary_chunks
@@ -17,10 +18,10 @@ class PNG:
         self.__img_path = file_path
         self.__data = self.__read_file()
         self.chunks = self.__init_chunks()
-        
+
         if not self.__is_png():
             raise ValueError("Given file is not a PNG file or it is corrupted")
-        
+
         self.__read_chunks()
 
         self.processing_arguments_mapping = {
@@ -50,9 +51,9 @@ class PNG:
 
         chunks = {}
         for chunk_name in self.list_of_chunks:
-                chunks[chunk_name] = None
+            chunks[chunk_name] = None
 
-        return chunks 
+        return chunks
 
     def __is_png(self) -> bool:
         ''' Checks if the file begins with the PNG signature
@@ -160,11 +161,11 @@ class PNG:
         data_rest = self.__data[8:]
         i = 0
         while i < len(data_rest):
-            length = utils.bytes_to_int(data_rest[i:i+4])
-            chunk_type = utils.bytes_to_string(data_rest[i+4:i+8])
-            chunk_data = data_rest[i+8:i+8+length] if length > 0 else b""
-            crc = utils.bytes_to_int(data_rest[i+8+length:i+8+length+4])
-            actual_crc = zlib.crc32(data_rest[i+4:i+8+length])
+            length = utils.bytes_to_int(data_rest[i:i + 4])
+            chunk_type = utils.bytes_to_string(data_rest[i + 4:i + 8])
+            chunk_data = data_rest[i + 8:i + 8 + length] if length > 0 else b""
+            crc = utils.bytes_to_int(data_rest[i + 8 + length:i + 8 + length + 4])
+            actual_crc = zlib.crc32(data_rest[i + 4:i + 8 + length])
 
             if chunk_type not in self.chunks.keys():
                 print(f"Decoded chunk {chunk_type} type not in the list of standard chunks")
@@ -182,7 +183,7 @@ class PNG:
                     raise KeyError(f"Chunk {chunk_type} does not allow multiple instances")
                 self.chunks[chunk_type] = chunks.Chunk(length, chunk_type, chunk_data, crc, crc != actual_crc)
 
-            i = i+8+length+4
+            i = i + 8 + length + 4
 
     def is_chunk_read(self, chunk_type: str) -> bool:
         ''' Checks if the chunk of the given name was read
@@ -225,7 +226,7 @@ class PNG:
         try:
             if chunk_type not in self.chunks.keys():
                 raise ValueError(f"Could not display chunk {chunk_type}, not in the list")
-            
+
             if not self.is_chunk_read(chunk_type):
                 raise ValueError(f"Could not display chunk {chunk_type}, it was not read")
 
@@ -309,3 +310,81 @@ class PNG:
         ax2.axis('off')
 
         plt.show()
+
+    def encrypt(self, public_key, save_file: bool = True, cipher_decompressed: bool = True):
+        encrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        img_data = self.__data[8:]
+
+        i = 0
+        while i < len(img_data):
+            length = utils.bytes_to_int(img_data[i:i + 4])
+            shift = length
+            chunk_type = img_data[i + 4:i + 8]
+            chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+
+            if utils.bytes_to_string(chunk_type) == "IDAT":
+                if cipher_decompressed:
+                    chunk_data = zlib.decompress(chunk_data)
+                length = len(chunk_data)
+                enc_data = b""
+                max_bytes = 64  # int(public_key.n.bit_length()/8-11)  # public key length - max encrypted data block size
+                for j in range(length // max_bytes + 1):
+                    # if (j + 1) * max_bytes >= len(chunk_data):
+                    #     enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], public_key)
+                    #     break
+                    enc_data += rsa.ecb_encrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], public_key)
+                if cipher_decompressed:
+                    chunk_data = zlib.compress(enc_data)
+                else:
+                    chunk_data = enc_data
+                length = len(chunk_data)
+            crc = zlib.crc32(chunk_type + chunk_data)
+
+            encrypted_img += length.to_bytes(4, 'big')
+            encrypted_img += chunk_type
+            encrypted_img += chunk_data
+            encrypted_img += crc.to_bytes(4, 'big')
+            i = i + 8 + shift + 4
+
+        if save_file:
+            with open("imgs/rsa/" + "encrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
+                output_file.write(encrypted_img)
+
+    def decrypt(self, private_key, save_file: bool = True, cipher_decompressed: bool = True):
+        decrypted_img = b"\x89\x50\x4E\x47\x0D\x0A\x1A\x0A"
+        img_data = self.__data[8:]
+
+        i = 0
+        while i < len(img_data):
+            length = utils.bytes_to_int(img_data[i:i + 4])
+            shift = length
+            chunk_type = img_data[i + 4:i + 8]
+            chunk_data = img_data[i + 8:i + 8 + length] if length > 0 else b""
+
+            if utils.bytes_to_string(chunk_type) == "IDAT":
+                if cipher_decompressed:
+                    chunk_data = zlib.decompress(chunk_data)
+                length = len(chunk_data)
+                dec_data = b""
+                max_bytes = 64  # private key length - encrypted data block size
+                for j in range(length // max_bytes + 1):
+                    # if (j + 1) * max_bytes >= len(chunk_data):
+                    #     dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:len(chunk_data) - 1], private_key)
+                    #     break
+                    dec_data += rsa.ecb_decrypt(chunk_data[j * max_bytes:(j + 1) * max_bytes], private_key)
+                if cipher_decompressed:
+                    chunk_data = zlib.compress(dec_data)
+                else:
+                    chunk_data = dec_data
+                length = len(chunk_data)
+            crc = zlib.crc32(chunk_type + chunk_data)
+
+            decrypted_img += length.to_bytes(4, 'big')
+            decrypted_img += chunk_type
+            decrypted_img += chunk_data
+            decrypted_img += crc.to_bytes(4, 'big')
+            i = i + 8 + shift + 4
+
+        if save_file:
+            with open("imgs/rsa/" + "decrypted_" + os.path.basename(self.__img_path), "wb") as output_file:
+                output_file.write(decrypted_img)
