@@ -1,9 +1,38 @@
 from math import gcd
-import libnum
+from sympy import randprime
 import random
 
-BITS = 1024
+BITS = 2048
 BLOCK_SIZE = 64
+
+def generate_rsa_keys():
+    half_bits = BITS // 2
+
+    min_p = (1 << half_bits)          # Min number of bit length: BITS // 2 + 1 
+    max_p = (1 << half_bits + 1) - 1  # Max number of bit length: BITS // 2 + 1
+    min_q = (1 << half_bits - 2)      # Min number of bit length: BITS // 2 - 1
+    max_q = (1 << half_bits - 1) - 1  # Max number of bit length: BITS // 2 - 1
+
+    p = randprime(min_p, max_p + 1)
+    q = randprime(min_q, max_q + 1)
+
+    n = p * q
+
+    while n.bit_length() != BITS:
+        p = randprime(min_p, max_p + 1)
+        q = randprime(min_q, max_q + 1)
+        n = p * q
+
+    print(f"Key length: {n.bit_length()}")
+
+    phi_n = (p - 1) * (q - 1)
+
+    e = choose_public_exponent(phi_n)
+    d = modular_inverse(e, phi_n)
+
+    public_key = (e, n)
+    private_key = (d, n)
+    return private_key, public_key
 
 def ecb_encrypt(bytes_str, public_key):
     e, n = public_key
@@ -18,33 +47,6 @@ def ecb_decrypt(bytes_str, private_key):
     plaintext_bytes = pow(ciphertext_int, d, n)
     # print(math.log2(plaintext_bytes))
     return plaintext_bytes.to_bytes(BLOCK_SIZE, "big")
-
-
-
-
-
-
-
-
-def generate_rsa_key_pair():
-    n = 0
-    while n.bit_length() != BITS:
-        p = libnum.generate_prime(BITS // 2 + 1)
-        q = libnum.generate_prime(BITS // 2 - 1)
-
-        n = p * q
-
-    print(f"Key length: {n.bit_length()}")
-
-    phi_n = (p - 1) * (q - 1)
-
-    e = choose_public_exponent(phi_n)
-
-    d = modular_inverse(e, phi_n)
-
-    public_key = (e, n)
-    private_key = (d, n)
-    return private_key, public_key
 
 
 def choose_public_exponent(phi_n):
@@ -66,3 +68,6 @@ def modular_inverse(a, m):
     if t1 < 0:
         t1 += m
     return t1
+
+if __name__ == '__main__':
+    generate_rsa_keys()
