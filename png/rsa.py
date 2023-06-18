@@ -5,6 +5,27 @@ import random
 BITS = 2048
 BLOCK_SIZE = 64
 
+def find_e(phi):
+    while True:
+        e = random.randint(2, phi)
+        if gcd(e, phi) == 1:
+            return e
+        
+def xgcd(a, m):
+    t0, t1 = 0, 1
+    r0, r1 = 1, 0
+    while a != 0:
+        (q, a), m = divmod(m, a), a
+        t0, t1 = t1, t0 - q * t1
+        r0, r1 = r1, r0 - q * r1
+    return m, t0, r0
+
+def modinv(a, m):
+    g, t0, _ = xgcd(a, m)
+    if g != 1:
+        raise Exception('gcd(a, b) != 1')
+    return t0 % m
+
 def generate_rsa_keys():
     half_bits = BITS // 2
 
@@ -23,12 +44,10 @@ def generate_rsa_keys():
         q = randprime(min_q, max_q + 1)
         n = p * q
 
-    print(f"Key length: {n.bit_length()}")
+    phi = (p - 1) * (q - 1)
 
-    phi_n = (p - 1) * (q - 1)
-
-    e = choose_public_exponent(phi_n)
-    d = modular_inverse(e, phi_n)
+    e = find_e(phi)
+    d = modinv(e, phi)
 
     public_key = (e, n)
     private_key = (d, n)
@@ -38,36 +57,16 @@ def ecb_encrypt(bytes_str, public_key):
     e, n = public_key
     plaintext_int = int.from_bytes(bytes_str, byteorder="big")
     ciphertext = pow(plaintext_int, e, n)
-    return ciphertext.to_bytes(BITS // 8, "big")
-
+    return ciphertext.to_bytes((ciphertext.bit_length() + 7) // 8, "big")  # Plus 7 is for rounding up
 
 def ecb_decrypt(bytes_str, private_key):
     d, n = private_key
     ciphertext_int = int.from_bytes(bytes_str, byteorder="big")
     plaintext_bytes = pow(ciphertext_int, d, n)
-    # print(math.log2(plaintext_bytes))
-    return plaintext_bytes.to_bytes(BLOCK_SIZE, "big")
-
-
-def choose_public_exponent(phi_n):
-    while True:
-        e = random.randint(2, phi_n)
-        if gcd(e, phi_n) == 1:
-            return e
-
-
-def modular_inverse(a, m):
-    t1, t2 = 0, 1
-    r1, r2 = m, a
-    while r2 != 0:
-        quotient = r1 // r2
-        t1, t2 = t2, t1 - quotient * t2
-        r1, r2 = r2, r1 - quotient * r2
-    if r1 > 1:
-        raise ValueError("a is not invertible")
-    if t1 < 0:
-        t1 += m
-    return t1
+    return plaintext_bytes.to_bytes((plaintext_bytes.bit_length() + 7) // 8, "big")  # Plus 7 is for rounding up)
 
 if __name__ == '__main__':
-    generate_rsa_keys()
+    priv, pub = generate_rsa_keys()
+    info = b'Hello World'
+    cipher = ecb_encrypt(info, pub)
+    plain = ecb_decrypt(cipher, priv)
