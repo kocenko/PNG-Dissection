@@ -8,6 +8,8 @@ from PIL import Image
 
 import zlib
 import matplotlib.pyplot as plt
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_OAEP
 
 
 class PNG:
@@ -315,13 +317,12 @@ class PNG:
     def encrypt(self, public_key, mode: str = "ECB", save_file: bool = True, cipher_decompressed: bool = True):
         if self.is_chunk_read('IDAT'):
             plain_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
-            # print(plain_data)
 
             if cipher_decompressed:
                 plain_data = zlib.decompress(plain_data)
 
             # Encrypting block by block
-            block_size = rsa.BITS // 8
+            block_size = rsa.BLOCK_SIZE
             block_num = (len(plain_data) + block_size - 1) // block_size
             plain_list = [plain_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
@@ -336,7 +337,13 @@ class PNG:
                     encrypted_list.append(rsa.ctr_decrypt(dat, public_key, counter))
                 enc_data = b''.join(encrypted_list)
                 print("ENCODED DATA LEN: " + str(len(enc_data)))
-            # enc_data = bytearray(enc_data)
+            if mode == "LIB":
+                e, n = public_key
+                lib_public = RSA.construct((n, e))
+                cipher = PKCS1_OAEP.new(lib_public)
+                for dat in plain_list:
+                    encrypted_list.append(cipher.encrypt(dat))
+                enc_data = b''.join(encrypted_list)
 
             if cipher_decompressed:
                 enc_data = zlib.compress(enc_data)
@@ -348,7 +355,7 @@ class PNG:
         if save_file:
             self.__save_to_file('encrypted.png', self.anonymize(False))
 
-    def decrypt(self, private_key, mode: str = "ECB", save_file: bool = True, cipher_decompressed: bool = True):
+    def decrypt(self, public_key, private_key, mode: str = "ECB", save_file: bool = True, cipher_decompressed: bool = True):
         if self.is_chunk_read('IDAT'):
             cipher_data = bytearray(itertools.chain.from_iterable(self.chunks['IDAT'].data))
 
@@ -371,12 +378,18 @@ class PNG:
                     counter += 1
                 dec_data = b''.join(decrypted_list)
                 print("DECODED DATA LEN: " + str(len(dec_data)))
+            if mode == "LIB":
+                d, n = private_key
+                e, n = public_key
+                lib_private = RSA.construct((n, e, d))
+                cipher = PKCS1_OAEP.new(lib_private)
+                for dat in cipher_list:
+                    decrypted_list.append(cipher.decrypt(dat))
+                dec_data = b''.join(decrypted_list)
 
 
             if cipher_decompressed:
                 dec_data = zlib.compress(dec_data)
-            # dec_data = bytearray(dec_data)
-            # print(dec_data)
 
             self.chunks['IDAT'].data = [dec_data]
             self.chunks['IDAT'].length = len(dec_data)

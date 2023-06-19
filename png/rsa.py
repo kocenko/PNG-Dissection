@@ -2,8 +2,8 @@ from math import gcd
 from sympy import randprime
 import random
 
-BITS = 2048
-BLOCK_SIZE = 128
+BITS = 1024
+BLOCK_SIZE = 64
 NONCE = int.from_bytes(((56854645).to_bytes(BITS // 8, "big")), byteorder="big")
 
 def find_e(phi):
@@ -54,14 +54,21 @@ def generate_rsa_keys():
     private_key = (d, n)
     return private_key, public_key
 
+def bytes_padding(bytes_str):
+    padding_length = 1 + (BLOCK_SIZE - len(bytes_str))
+    padding = bytes([padding_length]) * padding_length   # To store information about padding
+    return bytes_str + padding
+
+def bytes_unpadding(bytes_str):
+    padding_length = bytes_str[-1]
+    return bytes_str[:-padding_length]
+
 def ecb_encrypt(bytes_str, public_key):
+    bytes_str = bytes_padding(bytes_str)
     e, n = public_key
     plaintext_int = int.from_bytes(bytes_str, byteorder="big")
     ciphertext = pow(plaintext_int, e, n)
-    bytes_to_return = ciphertext.to_bytes(BITS // 8, "big")  # Plus 7 is for rounding up
-
-    # if len(bytes_to_return) == 0:
-    #     bytes_to_return = BITS // 8 * b'\x00'
+    bytes_to_return = ciphertext.to_bytes(BITS // 8, "big")
 
     return bytes_to_return
 
@@ -69,8 +76,10 @@ def ecb_decrypt(bytes_str, private_key):
     d, n = private_key
     ciphertext_int = int.from_bytes(bytes_str, byteorder="big")
     plaintext_bytes = pow(ciphertext_int, d, n)
+    bytes_to_return = plaintext_bytes.to_bytes(BLOCK_SIZE + 1, "big")
+    bytes_to_return = bytes_unpadding(bytes_to_return)
 
-    return plaintext_bytes.to_bytes(BLOCK_SIZE , "big")  # Plus 7 is for rounding up)
+    return bytes_to_return
 
 def ctr_encrypt(bytes_str, public_key, counter):
     e, n = public_key
