@@ -4,7 +4,7 @@ import random
 
 BITS = 2048
 BLOCK_SIZE = 128
-NONCE = 568
+NONCE = int.from_bytes(((56854645).to_bytes(BITS // 8, "big")), byteorder="big")
 
 def find_e(phi):
     while True:

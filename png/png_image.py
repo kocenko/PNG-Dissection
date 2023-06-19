@@ -321,7 +321,7 @@ class PNG:
                 plain_data = zlib.decompress(plain_data)
 
             # Encrypting block by block
-            block_size = rsa.BLOCK_SIZE
+            block_size = rsa.BITS // 8
             block_num = (len(plain_data) + block_size - 1) // block_size
             plain_list = [plain_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
@@ -331,12 +331,12 @@ class PNG:
                     encrypted_list.append(rsa.ecb_encrypt(dat, public_key))
                 enc_data = b''.join(encrypted_list)
             if mode == "CTR":
-                counter = 0
-                for dat in plain_list:
-                    encrypted_list.append(rsa.ctr_encrypt(dat, public_key, counter))
-                    counter += 1
+                print("ORIGINAL DATA LEN: " + str(len(b''.join(plain_list))))
+                for counter, dat in enumerate(plain_list):
+                    encrypted_list.append(rsa.ctr_decrypt(dat, public_key, counter))
                 enc_data = b''.join(encrypted_list)
                 print("ENCODED DATA LEN: " + str(len(enc_data)))
+            # enc_data = bytearray(enc_data)
 
             if cipher_decompressed:
                 enc_data = zlib.compress(enc_data)
@@ -366,8 +366,7 @@ class PNG:
                     decrypted_list.append(rsa.ecb_decrypt(dat, private_key))
                 dec_data = b''.join(decrypted_list)
             if mode == "CTR":
-                counter = 0
-                for dat in cipher_list:
+                for counter, dat in enumerate(cipher_list):
                     decrypted_list.append(rsa.ctr_encrypt(dat, private_key, counter))
                     counter += 1
                 dec_data = b''.join(decrypted_list)
@@ -376,7 +375,7 @@ class PNG:
 
             if cipher_decompressed:
                 dec_data = zlib.compress(dec_data)
-            dec_data = bytearray(dec_data)
+            # dec_data = bytearray(dec_data)
             # print(dec_data)
 
             self.chunks['IDAT'].data = [dec_data]
