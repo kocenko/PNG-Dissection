@@ -255,7 +255,7 @@ class PNG:
             cleared_image += (len(data_block).to_bytes(length=4, byteorder='big') +
                               self.chunks["IDAT"].identifier +
                               data_block +
-                              zlib.crc32(data_block).to_bytes(length=4, byteorder='big'))
+                              zlib.crc32(self.chunks["IDAT"].identifier + data_block).to_bytes(length=4, byteorder='big'))
 
         cleared_image += b'\x00\x00\x00\x00\x49\x45\x4e\x44\xae\x42\x60\x82'  # IEND chunk
 
@@ -322,7 +322,7 @@ class PNG:
                 plain_data = zlib.decompress(plain_data)
 
             # Encrypting block by block
-            block_size = rsa.BLOCK_SIZE
+            block_size = rsa.BLOCK_SIZE if mode != 'CTR' else rsa.BITS // 8
             block_num = (len(plain_data) + block_size - 1) // block_size
             plain_list = [plain_data[i * block_size: (i+1) * block_size] for i in range(block_num)]
 
@@ -334,7 +334,7 @@ class PNG:
             if mode == "CTR":
                 print("ORIGINAL DATA LEN: " + str(len(b''.join(plain_list))))
                 for counter, dat in enumerate(plain_list):
-                    encrypted_list.append(rsa.ctr_decrypt(dat, public_key, counter))
+                    encrypted_list.append(rsa.ctr_crypt(dat, public_key, counter))
                 enc_data = b''.join(encrypted_list)
                 print("ENCODED DATA LEN: " + str(len(enc_data)))
             if mode == "LIB":
@@ -374,7 +374,7 @@ class PNG:
                 dec_data = b''.join(decrypted_list)
             if mode == "CTR":
                 for counter, dat in enumerate(cipher_list):
-                    decrypted_list.append(rsa.ctr_encrypt(dat, private_key, counter))
+                    decrypted_list.append(rsa.ctr_crypt(dat, public_key, counter))
                     counter += 1
                 dec_data = b''.join(decrypted_list)
                 print("DECODED DATA LEN: " + str(len(dec_data)))

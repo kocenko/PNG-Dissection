@@ -69,7 +69,6 @@ def ecb_encrypt(bytes_str, public_key):
     plaintext_int = int.from_bytes(bytes_str, byteorder="big")
     ciphertext = pow(plaintext_int, e, n)
     bytes_to_return = ciphertext.to_bytes(BITS // 8, "big")
-
     return bytes_to_return
 
 def ecb_decrypt(bytes_str, private_key):
@@ -81,18 +80,11 @@ def ecb_decrypt(bytes_str, private_key):
 
     return bytes_to_return
 
-def ctr_encrypt(bytes_str, public_key, counter):
-    e, n = public_key
+def ctr_crypt(bytes_str, key, counter):
+    e, n = key
     plaintext_int = int.from_bytes(bytes_str, byteorder="big")
     a = counter + NONCE
     ciphertext = pow(a, e, n)
     msg = ciphertext ^ plaintext_int
     return msg.to_bytes(BITS // 8, "big")
 
-def ctr_decrypt(bytes_str, private_key, counter):
-    d, n = private_key
-    ciphertext_int = int.from_bytes(bytes_str, byteorder="big")
-    a = counter + NONCE
-    plaintext_bytes = pow(a, d, n)
-    msg = plaintext_bytes ^ ciphertext_int
-    return msg.to_bytes(BITS // 8, "big")
